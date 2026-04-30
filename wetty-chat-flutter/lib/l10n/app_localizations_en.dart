@@ -446,5 +446,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get swipeActionMarkUnread => 'Unread';
 
   @override
+  String get swipeActionArchive => 'Archive';
+
+  @override
+  String get swipeActionUnarchive => 'Unarchive';
+
+  @override
   String get selectChatPlaceholder => 'Select a chat';
 }
