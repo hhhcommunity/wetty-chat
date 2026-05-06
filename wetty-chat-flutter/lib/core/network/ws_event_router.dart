@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:async';
 
 import '../../features/conversation/shared/data/conversation_realtime_message_applier.dart';
+import '../../features/conversation/shared/application/thread_detail_membership_view_model.dart';
 import '../../features/chat_list/application/group_list_v2_store.dart';
 import '../../features/chat_list/application/thread_list_v2_store.dart';
 import '../../features/conversation/pins/application/pinned_messages_provider.dart';
@@ -46,6 +47,18 @@ final wsEventRouterProvider = Provider<void>((ref) {
     );
   }
 
+  void invalidateThreadDetailMembership({
+    required int chatId,
+    required int threadRootId,
+  }) {
+    ref.invalidate(
+      threadDetailMembershipViewModelProvider((
+        chatId: chatId,
+        threadRootId: threadRootId,
+      )),
+    );
+  }
+
   void applyMessageProjectionEvent(ApiWsEvent event, int? replyRootId) {
     final shouldReconcile = replyRootId == null
         ? ref.read(groupListV2StoreProvider.notifier).applyRealtimeEvent(event)
@@ -69,14 +82,22 @@ final wsEventRouterProvider = Provider<void>((ref) {
       case MessageDeletedWsEvent(:final payload):
         applyMessageProjectionEvent(event, payload.replyRootId);
         return;
-      case ThreadUpdatedWsEvent():
+      case ThreadUpdatedWsEvent(:final payload):
+        invalidateThreadDetailMembership(
+          chatId: payload.chatId,
+          threadRootId: payload.threadRootId,
+        );
         final shouldReconcile = ref
             .read(threadListV2StoreProvider.notifier)
             .applyRealtimeEvent(event);
         reconcileThreadsIfNeeded(shouldReconcile);
         return;
-      case ThreadMembershipChangedWsEvent():
+      case ThreadMembershipChangedWsEvent(:final payload):
         debugPrint('ThreadMembershipChangedWsEvent');
+        invalidateThreadDetailMembership(
+          chatId: payload.chatId,
+          threadRootId: payload.threadRootId,
+        );
         reconcileThreadsIfNeeded(true);
         return;
       case ReactionUpdatedWsEvent():
