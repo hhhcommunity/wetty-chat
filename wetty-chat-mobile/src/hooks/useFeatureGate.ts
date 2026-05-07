@@ -1,3 +1,5 @@
-export function useFeatureGate(): boolean {
-  return __FEATURE_GATES_ENABLED__;
+import { type Feature, isFeatureEnabled } from '@/features';
+
+export function useFeatureGate(feature: Feature): boolean {
+  return isFeatureEnabled(feature);
 }

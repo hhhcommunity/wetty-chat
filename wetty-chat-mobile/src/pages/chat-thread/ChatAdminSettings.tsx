@@ -68,7 +68,7 @@ export function ChatAdminSettings({
             rows={3}
           />
         </IonItem>
-        <FeatureGate>
+        <FeatureGate feature="chatVisibility">
           <IonItem>
             <IonIcon aria-hidden="true" icon={eye} slot="start" color="secondary" />
             <IonLabel>

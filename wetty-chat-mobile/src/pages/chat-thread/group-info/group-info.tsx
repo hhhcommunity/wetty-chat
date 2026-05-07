@@ -32,6 +32,7 @@ import { ShareInviteModal } from '@/components/chat/settings/ShareInviteModal';
 import { GroupSettingsActionButton } from '@/components/chat/settings/GroupSettingsActionButton';
 import { ChatAttachmentSection } from '@/components/chat/attachments/ChatAttachmentSection';
 import { useGroupInfoMetadata } from './useGroupInfoMetadata';
+import { FeatureGate } from '@/components/FeatureGate';
 
 interface GroupInfoCoreProps {
   chatId?: string;
@@ -96,7 +97,9 @@ function GroupInfoContent({
         </IonList>
       </ChatRoleGate>
 
-      <ChatAttachmentSection chatId={chatId} />
+      <FeatureGate feature="chatAttachments">
+        <ChatAttachmentSection chatId={chatId} />
+      </FeatureGate>
 
       <IonList inset>
         <IonItem button detail={false} disabled={leavingGroup} onClick={onLeaveGroup}>

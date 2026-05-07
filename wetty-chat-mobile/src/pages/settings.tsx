@@ -158,7 +158,7 @@ export function SettingsCore({ backAction, onOpenGeneral, onOpenStickers }: Sett
           </IonItem>
         </IonList>
 
-        <FeatureGate>
+        <FeatureGate feature="developerSettings">
           <IonListHeader>
             <IonLabel>Developer</IonLabel>
           </IonListHeader>

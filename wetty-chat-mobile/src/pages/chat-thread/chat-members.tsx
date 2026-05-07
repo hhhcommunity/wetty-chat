@@ -398,7 +398,7 @@ export default function ChatMembersCore({ chatId: propChatId, backAction }: Chat
           </div>
         ) : (
           <div className={styles.layout}>
-            <FeatureGate>
+            <FeatureGate feature="chatMemberAdd">
               <div className={styles.addMemberAction}>
                 <IonButton expand="block" onClick={handleAddMember}>
                   <Trans>Add Member</Trans>

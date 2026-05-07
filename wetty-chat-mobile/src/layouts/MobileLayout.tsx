@@ -24,7 +24,7 @@ import NotFoundPage from '@/pages/not-found';
 import ComponentDemoPage from '@/pages/component-demo';
 
 import { safariSafeRouteAnimation } from '@/utils/navigationHistory';
-import { useFeatureGate } from '@/hooks/useFeatureGate';
+import { featureGatedList, whenFeature } from '@/features';
 import { selectTotalUnreadChatCount } from '@/store/chatsSlice';
 import styles from './MobileLayout.module.scss';
 
@@ -32,12 +32,11 @@ const TAB_ROOT_PATHS = ['/', '/chats', '/settings', '/demo'];
 
 const MobileLayout: React.FC = () => {
   const location = useLocation();
-  const isFeatureGateEnabled = useFeatureGate();
   const unreadChatCount = useSelector(selectTotalUnreadChatCount);
   const isTabRoot = TAB_ROOT_PATHS.includes(location.pathname);
 
   const tabBarButtons = useMemo(() => {
-    const buttons = [
+    return featureGatedList([
       <IonTabButton tab="chats" href="/chats" key="chats">
         <IonIcon icon={chatbubbles} />
         <IonLabel>
@@ -51,19 +50,15 @@ const MobileLayout: React.FC = () => {
           <Trans>Settings</Trans>
         </IonLabel>
       </IonTabButton>,
-    ];
-
-    if (isFeatureGateEnabled) {
-      buttons.push(
+      whenFeature(
+        'demoPage',
         <IonTabButton tab="demo" href="/demo" key="demo">
           <IonIcon icon={flask} />
           <IonLabel>Demo</IonLabel>
         </IonTabButton>,
-      );
-    }
-
-    return buttons;
-  }, [isFeatureGateEnabled, unreadChatCount]);
+      ),
+    ]);
+  }, [unreadChatCount]);
 
   return (
     <IonTabs className={`${isTabRoot ? '' : styles.tabBarHidden}`}>
