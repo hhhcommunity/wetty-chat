@@ -39,7 +39,7 @@ type InviteViewState =
       statusTone?: 'info' | 'error';
       supporting?: ReactNode;
       avatarUrl: string | null;
-      actions: [InviteAction, InviteAction];
+      actions: InviteAction[];
     };
 
 type InviteErrorCopy = {
@@ -53,6 +53,7 @@ export interface InvitePreviewCardProps {
   inviteCode: string;
   onResolved: (chat: GroupInfoResponse) => void | Promise<void>;
   onCancel: () => void;
+  showAlreadyMemberOpenChatAction?: boolean;
 }
 
 function buildInviteError(context: InviteErrorContext, status?: number): InviteErrorCopy {
@@ -127,7 +128,12 @@ function InviteStatus({ message, tone = 'info' }: InviteStatusProps) {
   return <div className={className}>{message}</div>;
 }
 
-export function InvitePreviewCard({ inviteCode, onResolved, onCancel }: InvitePreviewCardProps) {
+export function InvitePreviewCard({
+  inviteCode,
+  onResolved,
+  onCancel,
+  showAlreadyMemberOpenChatAction = true,
+}: InvitePreviewCardProps) {
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState<InviteErrorCopy | null>(null);
   const resolveChat = useInviteChatResolver(onResolved);
@@ -173,6 +179,26 @@ export function InvitePreviewCard({ inviteCode, onResolved, onCancel }: InvitePr
     }
 
     if (previewState.data.alreadyMember) {
+      const actions: InviteAction[] = showAlreadyMemberOpenChatAction
+        ? [
+            {
+              label: <Trans>Open chat</Trans>,
+              onClick: openChat,
+            },
+            {
+              label: <Trans>Back</Trans>,
+              fill: 'clear',
+              onClick: onCancel,
+            },
+          ]
+        : [
+            {
+              label: <Trans>Not now</Trans>,
+              fill: 'clear',
+              onClick: onCancel,
+            },
+          ];
+
       return {
         kind: 'loaded',
         eyebrow: <Trans>Invite</Trans>,
@@ -181,17 +207,7 @@ export function InvitePreviewCard({ inviteCode, onResolved, onCancel }: InvitePr
           previewState.data.chat.description?.trim() || t`Join this chat to start reading and sending messages.`,
         statusMessage: t`You are already a member`,
         avatarUrl: previewState.data.chat.avatar,
-        actions: [
-          {
-            label: <Trans>Open chat</Trans>,
-            onClick: openChat,
-          },
-          {
-            label: <Trans>Back to chats</Trans>,
-            fill: 'clear',
-            onClick: onCancel,
-          },
-        ],
+        actions,
       };
     }
 
