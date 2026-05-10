@@ -35,6 +35,23 @@ void main() {
     expect(profile?.permissions, <String>['admin']);
   });
 
+  test('maps current user profile to message user', () {
+    const profile = CurrentUserProfile(
+      uid: 42,
+      username: 'Alice',
+      avatarUrl: 'https://example.com/alice.png',
+      gender: 1,
+    );
+
+    final user = profile.toMessageUser();
+
+    expect(user.uid, 42);
+    expect(user.name, 'Alice');
+    expect(user.avatarUrl, 'https://example.com/alice.png');
+    expect(user.gender, 1);
+    expect(user.userGroup, isNull);
+  });
+
   test('does not fetch a profile when unauthenticated', () async {
     final api = _FakeCurrentUserApiService(
       response: const CurrentUserDto(uid: 42, username: 'Alice'),

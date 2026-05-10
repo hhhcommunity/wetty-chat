@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:chahua/core/api/models/current_user_api_models.dart';
 import 'package:chahua/core/api/services/current_user_api_service.dart';
 import 'package:chahua/core/session/dev_session_store.dart';
+import 'package:chahua/features/shared/model/message/user.dart';
 
 class CurrentUserProfile {
   const CurrentUserProfile({
@@ -27,6 +28,10 @@ class CurrentUserProfile {
       gender: dto.gender,
       permissions: dto.permissions,
     );
+  }
+
+  User toMessageUser() {
+    return User(uid: uid, name: username, avatarUrl: avatarUrl, gender: gender);
   }
 }
 

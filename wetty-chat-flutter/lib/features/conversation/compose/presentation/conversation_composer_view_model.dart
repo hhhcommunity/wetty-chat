@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voice_message/voice_message.dart';
 
 import 'package:chahua/core/network/dio_client.dart';
+import 'package:chahua/core/session/current_user_profile.dart';
 import 'package:chahua/core/session/dev_session_store.dart';
 import 'package:chahua/features/conversation/compose/presentation/conversation_draft_store.dart';
 import 'package:chahua/features/conversation/compose/presentation/conversation_local_mutation_registry.dart';
@@ -543,10 +544,9 @@ class ConversationComposerViewModel
         .map((item) => item.toAttachmentItem())
         .toList(growable: false);
 
-    final currentUserId = ref.read(authSessionProvider).currentUserId;
     await _sendMessage(
       _ComposerSendRequest(
-        sender: User(uid: currentUserId, name: 'You'),
+        sender: _optimisticSender(),
         text: trimmed,
         messageType: 'text',
         optimisticAttachments: optimisticAttachments,
@@ -560,11 +560,10 @@ class ConversationComposerViewModel
 
   Future<void> sendSticker(StickerSummary sticker) async {
     final stickerId = sticker.id;
-    final currentUserId = ref.read(authSessionProvider).currentUserId;
     final mode = state.mode;
     await _sendMessage(
       _ComposerSendRequest(
-        sender: User(uid: currentUserId, name: 'You'),
+        sender: _optimisticSender(),
         text: '',
         messageType: 'sticker',
         optimisticAttachments: const [],
@@ -959,7 +958,6 @@ class ConversationComposerViewModel
       }
     }
 
-    final currentUserId = ref.read(authSessionProvider).currentUserId;
     final mode = state.mode;
     await ref
         .read(audioWaveformCacheServiceProvider)
@@ -970,7 +968,7 @@ class ConversationComposerViewModel
         );
     await _sendMessage(
       _ComposerSendRequest(
-        sender: User(uid: currentUserId, name: 'You'),
+        sender: _optimisticSender(),
         text: '',
         messageType: 'audio',
         optimisticAttachments: [
@@ -982,6 +980,17 @@ class ConversationComposerViewModel
             : null,
       ),
     );
+  }
+
+  User _optimisticSender() {
+    final currentUserId = ref.read(authSessionProvider).currentUserId;
+    final profile = ref
+        .read(currentUserProfileProvider)
+        .maybeWhen(data: (profile) => profile, orElse: () => null);
+    if (profile != null && profile.uid == currentUserId) {
+      return profile.toMessageUser();
+    }
+    return User(uid: currentUserId, name: 'User $currentUserId');
   }
 
   /// Perform the core message sending. Realistically it is optimistic send
