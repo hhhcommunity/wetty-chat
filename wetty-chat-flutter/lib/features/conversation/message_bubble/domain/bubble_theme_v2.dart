@@ -15,6 +15,7 @@ class BubbleThemeV2 extends InheritedWidget {
     super.key,
     required this.isMe,
     required this.isInteractive,
+    this.isTextSelectable = false,
     required this.maxBubbleWidth,
     required this.timeSpacerWidth,
     required this.chatMessageFontSize,
@@ -31,6 +32,7 @@ class BubbleThemeV2 extends InheritedWidget {
     required ConversationMessageV2 message,
     required bool isMe,
     required bool isInteractive,
+    bool isTextSelectable = false,
     required double chatMessageFontSize,
     double? timelineViewportWidth,
     required Widget child,
@@ -43,6 +45,7 @@ class BubbleThemeV2 extends InheritedWidget {
       key: key,
       isMe: isMe,
       isInteractive: isInteractive,
+      isTextSelectable: isTextSelectable,
       maxBubbleWidth: math.max(
         0,
         (viewportWidth * _maxRowWidthFactor) -
@@ -63,6 +66,7 @@ class BubbleThemeV2 extends InheritedWidget {
 
   final bool isMe;
   final bool isInteractive;
+  final bool isTextSelectable;
   final double maxBubbleWidth;
   final double timeSpacerWidth;
   final double chatMessageFontSize;
@@ -83,6 +87,7 @@ class BubbleThemeV2 extends InheritedWidget {
   bool updateShouldNotify(BubbleThemeV2 old) {
     return isMe != old.isMe ||
         isInteractive != old.isInteractive ||
+        isTextSelectable != old.isTextSelectable ||
         maxBubbleWidth != old.maxBubbleWidth ||
         timeSpacerWidth != old.timeSpacerWidth ||
         chatMessageFontSize != old.chatMessageFontSize ||

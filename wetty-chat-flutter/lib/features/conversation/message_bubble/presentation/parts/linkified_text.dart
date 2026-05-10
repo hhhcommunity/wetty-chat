@@ -37,17 +37,95 @@ class LinkifiedText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = BubbleThemeV2.of(context);
-    return Text.rich(
-      TextSpan(
-        children: [
-          ..._buildLinkedSpans(context, theme),
-          WidgetSpan(child: SizedBox(width: theme.timeSpacerWidth, height: 14)),
-        ],
-      ),
+    final span = TextSpan(
+      children: [
+        ..._buildLinkedSpans(context, theme),
+        WidgetSpan(child: SizedBox(width: theme.timeSpacerWidth, height: 14)),
+      ],
     );
+    return Text.rich(span);
   }
 
   List<InlineSpan> _buildLinkedSpans(
+    BuildContext context,
+    BubbleThemeV2 theme,
+  ) {
+    if (theme.isTextSelectable) {
+      return _buildSelectableSpans(context, theme);
+    }
+    return _buildInteractiveSpans(context, theme);
+  }
+
+  List<InlineSpan> _buildSelectableSpans(
+    BuildContext context,
+    BubbleThemeV2 theme,
+  ) {
+    final mentionsById = <int, MentionInfo>{
+      for (final mention in mentions) mention.uid: mention,
+    };
+    final mentionTextColor = theme.isMe
+        ? CupertinoColors.white
+        : CupertinoColors.activeBlue.resolveFrom(context);
+    final spans = <InlineSpan>[];
+    var lastEnd = 0;
+    for (final match in _tokenRegex.allMatches(text)) {
+      if (match.start > lastEnd) {
+        spans.add(
+          TextSpan(
+            text: text.substring(lastEnd, match.start),
+            style: textStyle,
+          ),
+        );
+      }
+
+      final token = match.group(0)!;
+      final mentionUid = _parseMentionUid(token);
+      if (mentionUid != null) {
+        final mention = mentionsById[mentionUid];
+        final username = mention?.username;
+        final visibleText =
+            '@${(username != null && username.isNotEmpty) ? username : 'User $mentionUid'}';
+        spans.add(
+          TextSpan(
+            text: visibleText,
+            style: textStyle.copyWith(
+              color: mentionTextColor,
+              fontWeight: AppFontWeights.semibold,
+            ),
+          ),
+        );
+      } else {
+        spans.add(
+          TextSpan(
+            text: token,
+            style: textStyle.copyWith(
+              color: theme.linkColor,
+              decoration: TextDecoration.underline,
+              decorationColor: theme.linkColor,
+            ),
+          ),
+        );
+      }
+      lastEnd = match.end;
+    }
+
+    if (lastEnd < text.length) {
+      spans.add(TextSpan(text: text.substring(lastEnd), style: textStyle));
+    }
+    if (spans.isEmpty) {
+      spans.add(TextSpan(text: text, style: textStyle));
+    }
+    return spans;
+  }
+
+  List<InlineSpan> _buildInteractiveSpans(
+    BuildContext context,
+    BubbleThemeV2 theme,
+  ) {
+    return [..._buildLinkedSpansWithGestures(context, theme)];
+  }
+
+  List<InlineSpan> _buildLinkedSpansWithGestures(
     BuildContext context,
     BubbleThemeV2 theme,
   ) {

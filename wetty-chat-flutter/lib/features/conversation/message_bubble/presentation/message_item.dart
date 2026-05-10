@@ -17,6 +17,7 @@ class MessageItem extends ConsumerWidget {
     required this.isMe,
     required this.isInteractive,
     required this.showSenderName,
+    this.isTextSelectable = false,
     this.timelineViewportWidth,
     this.onToggleReaction,
     this.onTapReply,
@@ -29,6 +30,7 @@ class MessageItem extends ConsumerWidget {
   final bool isMe;
   final bool isInteractive;
   final bool showSenderName;
+  final bool isTextSelectable;
   final double? timelineViewportWidth;
   final ValueChanged<String>? onToggleReaction;
   final VoidCallback? onTapReply;
@@ -44,6 +46,7 @@ class MessageItem extends ConsumerWidget {
       message: message,
       isMe: isMe,
       isInteractive: isInteractive,
+      isTextSelectable: isTextSelectable,
       chatMessageFontSize: chatMessageFontSize,
       timelineViewportWidth: timelineViewportWidth,
       child: switch (message.content) {

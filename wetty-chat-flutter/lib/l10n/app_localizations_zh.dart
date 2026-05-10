@@ -222,6 +222,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get reply => '回复';
 
   @override
+  String get copyMessageAction => '复制';
+
+  @override
   String get edit => '编辑';
 
   @override
@@ -660,6 +663,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get reply => '回覆';
+
+  @override
+  String get copyMessageAction => '複製';
 
   @override
   String get edit => '編輯';

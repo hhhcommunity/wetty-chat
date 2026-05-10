@@ -1,0 +1,71 @@
+import 'package:chahua/core/providers/shared_preferences_provider.dart';
+import 'package:chahua/features/conversation/message_bubble/presentation/message_item.dart';
+import 'package:chahua/features/conversation/timeline/model/message_long_press_details_v2.dart';
+import 'package:chahua/features/conversation/timeline/presentation/message_overlay/message_overlay_bubble_v2.dart';
+import 'package:chahua/features/shared/model/message/message.dart'
+    hide MessageItem;
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart' show SelectionArea;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+void main() {
+  testWidgets('overlay bubble renders message text as selectable', (
+    tester,
+  ) async {
+    await _pumpWithSettings(
+      tester,
+      MessageOverlayBubbleV2(
+        details: MessageLongPressDetailsV2(
+          message: _textMessage(),
+          bubbleRect: const Rect.fromLTWH(0, 0, 240, 80),
+          isMe: false,
+          sourceShowsSenderName: false,
+        ),
+      ),
+    );
+
+    expect(find.byType(SelectionArea), findsOneWidget);
+  });
+
+  testWidgets('normal message item keeps text non-selectable by default', (
+    tester,
+  ) async {
+    await _pumpWithSettings(
+      tester,
+      MessageItem(
+        message: _textMessage(),
+        isMe: false,
+        isInteractive: true,
+        showSenderName: false,
+      ),
+    );
+
+    expect(find.byType(SelectionArea), findsNothing);
+  });
+}
+
+Future<void> _pumpWithSettings(WidgetTester tester, Widget child) async {
+  SharedPreferences.setMockInitialValues({});
+  final preferences = await SharedPreferences.getInstance();
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [sharedPreferencesProvider.overrideWithValue(preferences)],
+      child: CupertinoApp(
+        home: CupertinoPageScaffold(
+          child: Center(child: SizedBox(width: 320, child: child)),
+        ),
+      ),
+    ),
+  );
+}
+
+ConversationMessageV2 _textMessage() {
+  return ConversationMessageV2(
+    clientGeneratedId: 'client-1',
+    sender: const User(uid: 2, name: 'Sender'),
+    createdAt: DateTime(2026, 5, 10, 12),
+    content: const TextMessageContent(text: 'Hello https://example.com'),
+  );
+}

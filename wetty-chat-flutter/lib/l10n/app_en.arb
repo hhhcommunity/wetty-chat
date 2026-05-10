@@ -214,6 +214,9 @@
   "reply": "Reply",
   "@reply": { "description": "Message action label for replying" },
 
+  "copyMessageAction": "Copy",
+  "@copyMessageAction": { "description": "Message action label for copying message text" },
+
   "edit": "Edit",
   "@edit": { "description": "Message action label for editing" },
 

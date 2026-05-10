@@ -525,6 +525,12 @@ abstract class AppLocalizations {
   /// **'Reply'**
   String get reply;
 
+  /// Message action label for copying message text
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get copyMessageAction;
+
   /// Message action label for editing
   ///
   /// In en, this message translates to:

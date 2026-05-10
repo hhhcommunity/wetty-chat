@@ -225,6 +225,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reply => 'Reply';
 
   @override
+  String get copyMessageAction => 'Copy';
+
+  @override
   String get edit => 'Edit';
 
   @override

@@ -3,6 +3,7 @@ import 'dart:developer';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 
 import 'package:chahua/app/theme/style_config.dart';
 import 'package:chahua/core/session/dev_session_store.dart';
@@ -338,6 +339,10 @@ class _ConversationSurfaceV2State extends ConsumerState<ConversationSurfaceV2> {
     final isOwn = message.sender.uid == currentUserId;
     final canManagePins = _canManagePins;
     final pinnedPin = _pinForMessage(message);
+    final copyText = switch (message.content) {
+      TextMessageContent(:final text) when text.trim().isNotEmpty => text,
+      _ => null,
+    };
     final composerNotifier = ref.read(
       conversationComposerViewModelProvider(widget.identity).notifier,
     );
@@ -350,6 +355,15 @@ class _ConversationSurfaceV2State extends ConsumerState<ConversationSurfaceV2> {
           composerNotifier.beginReply(message);
         },
       ),
+      if (copyText != null)
+        MessageOverlayActionV2(
+          label: l10n.copyMessageAction,
+          icon: CupertinoIcons.doc_on_doc,
+          onPressed: () {
+            _dismissMessageOverlay();
+            unawaited(Clipboard.setData(ClipboardData(text: copyText)));
+          },
+        ),
       if (_canStartThreadFrom(message))
         MessageOverlayActionV2(
           label: l10n.startThread,
