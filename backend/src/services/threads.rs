@@ -69,7 +69,32 @@ pub fn subscribe_to_thread(
     thread_root_id: i64,
     uid: i32,
 ) -> Result<bool, diesel::result::Error> {
+    let existing_archived = get_subscription_state(conn, chat_id, thread_root_id, uid)?;
+
+    if matches!(existing_archived, Some(false)) {
+        return Ok(false);
+    }
+
     let last_read_message_id = latest_visible_thread_message_id(conn, chat_id, thread_root_id)?;
+
+    if matches!(existing_archived, Some(true)) {
+        let updated = diesel::update(
+            thread_subscriptions::table.filter(
+                thread_subscriptions::chat_id
+                    .eq(chat_id)
+                    .and(thread_subscriptions::thread_root_id.eq(thread_root_id))
+                    .and(thread_subscriptions::uid.eq(uid)),
+            ),
+        )
+        .set((
+            thread_subscriptions::last_read_message_id.eq(last_read_message_id),
+            thread_subscriptions::subscribed_at.eq(Utc::now()),
+            thread_subscriptions::archived.eq(false),
+        ))
+        .execute(conn)?;
+        return Ok(updated > 0);
+    }
+
     let inserted = diesel::insert_into(thread_subscriptions::table)
         .values((
             thread_subscriptions::chat_id.eq(chat_id),

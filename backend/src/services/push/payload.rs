@@ -1,0 +1,220 @@
+use serde::Serialize;
+
+use crate::models::MessageType;
+
+use super::PushJob;
+
+pub(super) const MESSAGE_PREVIEW_MAX: usize = 100;
+pub(super) const APNS_TITLE_LOC_KEY: &str = "push.chat.title";
+pub(super) const APNS_BODY_LOC_KEY_WITH_PREVIEW: &str = "push.message.body";
+pub(super) const APNS_BODY_LOC_KEY_NO_PREVIEW: &str = "push.message.body.generic";
+pub(super) const APNS_BODY_LOC_KEY_AUDIO: &str = "push.message.body.audio";
+const APNS_BODY_LOC_KEY_AUDIO_WITH_PREVIEW: &str = "push.message.body.audio.with_preview";
+pub(super) const APNS_BODY_LOC_KEY_IMAGE: &str = "push.message.body.image";
+pub(super) const APNS_BODY_LOC_KEY_IMAGE_WITH_PREVIEW: &str =
+    "push.message.body.image.with_preview";
+pub(super) const APNS_BODY_LOC_KEY_VIDEO: &str = "push.message.body.video";
+const APNS_BODY_LOC_KEY_VIDEO_WITH_PREVIEW: &str = "push.message.body.video.with_preview";
+const APNS_BODY_LOC_KEY_STICKER: &str = "push.message.body.sticker";
+pub(super) const APNS_BODY_LOC_KEY_STICKER_EMOJI: &str = "push.message.body.sticker.emoji";
+pub(super) const APNS_BODY_LOC_KEY_INVITE: &str = "push.message.body.invite";
+const APNS_BODY_LOC_KEY_ATTACHMENT: &str = "push.message.body.attachment";
+const APNS_BODY_LOC_KEY_ATTACHMENT_WITH_PREVIEW: &str = "push.message.body.attachment.with_preview";
+const APNS_BODY_LOC_KEY_DELETED: &str = "push.message.body.deleted";
+
+/// A push notification job enqueued when a new message is created.
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub(super) enum PushPayloadType {
+    NewMessage,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PushMessagePreviewSticker {
+    pub emoji: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PushMessagePreview {
+    pub message: Option<String>,
+    pub message_type: MessageType,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sticker: Option<PushMessagePreviewSticker>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub first_attachment_kind: Option<String>,
+    pub is_deleted: bool,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct PushPayloadData {
+    pub(super) chat_id: String,
+    pub(super) message_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(super) thread_root_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct PushPayload {
+    #[serde(rename = "type")]
+    pub(super) type_: PushPayloadType,
+    pub(super) title: String,
+    pub(super) body: String,
+    pub(super) sender_name: String,
+    pub(super) message_preview: PushMessagePreview,
+    pub(super) unread_count: i64,
+    pub(super) data: PushPayloadData,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct ApnsCustomData {
+    #[serde(rename = "type")]
+    pub(super) type_: PushPayloadType,
+    pub(super) chat_id: String,
+    pub(super) message_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(super) thread_root_id: Option<String>,
+    pub(super) sender_name: String,
+    pub(super) message_preview: PushMessagePreview,
+    pub(super) unread_count: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct ApnsNotification {
+    pub(super) title_loc_key: &'static str,
+    pub(super) title_loc_args: Vec<String>,
+    pub(super) body_loc_key: &'static str,
+    pub(super) body_loc_args: Vec<String>,
+    pub(super) badge: u32,
+    pub(super) thread_id: String,
+    pub(super) custom_data: ApnsCustomData,
+}
+
+pub(super) fn build_push_payload(job: &PushJob, unread_count: i64, body_text: &str) -> PushPayload {
+    PushPayload {
+        type_: PushPayloadType::NewMessage,
+        title: job.chat_name.clone(),
+        body: body_text.to_string(),
+        sender_name: job.sender_username.clone(),
+        message_preview: job.message_preview.clone(),
+        unread_count,
+        data: PushPayloadData {
+            chat_id: job.chat_id.to_string(),
+            message_id: job.message_id.to_string(),
+            thread_root_id: job.thread_root_id.map(|id| id.to_string()),
+        },
+    }
+}
+
+pub(super) fn build_apns_notification(job: &PushJob, unread_count: i64) -> ApnsNotification {
+    let badge = unread_count.clamp(0, u32::MAX as i64) as u32;
+    let preview = &job.message_preview;
+
+    let (body_loc_key, body_loc_args) = if preview.is_deleted {
+        (APNS_BODY_LOC_KEY_DELETED, vec![job.sender_username.clone()])
+    } else {
+        match preview.message_type {
+            MessageType::Audio => (APNS_BODY_LOC_KEY_AUDIO, vec![job.sender_username.clone()]),
+            MessageType::Sticker => match &preview.sticker {
+                Some(s) if !s.emoji.trim().is_empty() => (
+                    APNS_BODY_LOC_KEY_STICKER_EMOJI,
+                    vec![job.sender_username.clone(), s.emoji.clone()],
+                ),
+                _ => (APNS_BODY_LOC_KEY_STICKER, vec![job.sender_username.clone()]),
+            },
+            MessageType::Invite => (APNS_BODY_LOC_KEY_INVITE, vec![job.sender_username.clone()]),
+            _ => {
+                if let Some(ref kind) = preview.first_attachment_kind {
+                    if let Some(ref msg) = preview.message {
+                        (
+                            attachment_kind_loc_key_with_preview(kind),
+                            vec![job.sender_username.clone(), truncate_preview(msg)],
+                        )
+                    } else {
+                        (
+                            attachment_kind_loc_key(kind),
+                            vec![job.sender_username.clone()],
+                        )
+                    }
+                } else if let Some(ref msg) = preview.message {
+                    (
+                        APNS_BODY_LOC_KEY_WITH_PREVIEW,
+                        vec![job.sender_username.clone(), truncate_preview(msg)],
+                    )
+                } else {
+                    (
+                        APNS_BODY_LOC_KEY_NO_PREVIEW,
+                        vec![job.sender_username.clone()],
+                    )
+                }
+            }
+        }
+    };
+
+    let thread_id = match job.thread_root_id {
+        Some(root_id) => format!("chat_{}_thread_{}", job.chat_id, root_id),
+        None => format!("chat_{}", job.chat_id),
+    };
+
+    ApnsNotification {
+        title_loc_key: APNS_TITLE_LOC_KEY,
+        title_loc_args: vec![job.chat_name.clone()],
+        body_loc_key,
+        body_loc_args,
+        badge,
+        thread_id,
+        custom_data: ApnsCustomData {
+            type_: PushPayloadType::NewMessage,
+            chat_id: job.chat_id.to_string(),
+            message_id: job.message_id.to_string(),
+            thread_root_id: job.thread_root_id.map(|id| id.to_string()),
+            sender_name: job.sender_username.clone(),
+            message_preview: job.message_preview.clone(),
+            unread_count,
+        },
+    }
+}
+
+fn attachment_kind_loc_key(kind: &str) -> &'static str {
+    if kind.starts_with("image/") {
+        APNS_BODY_LOC_KEY_IMAGE
+    } else if kind.starts_with("video/") {
+        APNS_BODY_LOC_KEY_VIDEO
+    } else if kind.starts_with("audio/") {
+        APNS_BODY_LOC_KEY_AUDIO
+    } else {
+        APNS_BODY_LOC_KEY_ATTACHMENT
+    }
+}
+
+fn attachment_kind_loc_key_with_preview(kind: &str) -> &'static str {
+    if kind.starts_with("image/") {
+        APNS_BODY_LOC_KEY_IMAGE_WITH_PREVIEW
+    } else if kind.starts_with("video/") {
+        APNS_BODY_LOC_KEY_VIDEO_WITH_PREVIEW
+    } else if kind.starts_with("audio/") {
+        APNS_BODY_LOC_KEY_AUDIO_WITH_PREVIEW
+    } else {
+        APNS_BODY_LOC_KEY_ATTACHMENT_WITH_PREVIEW
+    }
+}
+
+pub(super) fn format_push_body(sender_username: &str, preview: Option<&str>) -> String {
+    match preview {
+        Some(preview) => format!("{}: {}", sender_username, truncate_preview(preview)),
+        None => format!("{} sent a message", sender_username),
+    }
+}
+
+pub(super) fn truncate_preview(preview: &str) -> String {
+    let truncated: String = preview.chars().take(MESSAGE_PREVIEW_MAX).collect();
+    if preview.chars().count() > MESSAGE_PREVIEW_MAX {
+        format!("{truncated}…")
+    } else {
+        truncated
+    }
+}
