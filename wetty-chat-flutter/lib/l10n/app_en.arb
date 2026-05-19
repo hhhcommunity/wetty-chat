@@ -247,6 +247,12 @@
   "pinMessage": "Pin",
   "@pinMessage": { "description": "Message action label for pinning a message" },
 
+  "pinMessageTitle": "Pin message?",
+  "@pinMessageTitle": { "description": "Confirmation dialog title for pinning a message" },
+
+  "pinMessageBody": "This pins it for everyone in the chat.",
+  "@pinMessageBody": { "description": "Confirmation dialog body for pinning a message" },
+
   "unpinMessage": "Unpin",
   "@unpinMessage": { "description": "Message action label for unpinning a message" },
 

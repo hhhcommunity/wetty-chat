@@ -88,6 +88,8 @@
   "newThread": "新话题",
   "startThread": "创建话题",
   "pinMessage": "置顶",
+  "pinMessageTitle": "置顶这条消息？",
+  "pinMessageBody": "这会为所有人在聊天中置顶它。",
   "unpinMessage": "取消置顶",
   "unpinMessageTitle": "取消置顶这条消息？",
   "unpinMessageBody": "这会为所有人从置顶消息中移除它。",

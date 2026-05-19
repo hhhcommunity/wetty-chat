@@ -258,6 +258,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pinMessage => 'Pin';
 
   @override
+  String get pinMessageTitle => 'Pin message?';
+
+  @override
+  String get pinMessageBody => 'This pins it for everyone in the chat.';
+
+  @override
   String get unpinMessage => 'Unpin';
 
   @override

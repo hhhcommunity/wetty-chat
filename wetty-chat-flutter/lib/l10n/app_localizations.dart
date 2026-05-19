@@ -591,6 +591,18 @@ abstract class AppLocalizations {
   /// **'Pin'**
   String get pinMessage;
 
+  /// Confirmation dialog title for pinning a message
+  ///
+  /// In en, this message translates to:
+  /// **'Pin message?'**
+  String get pinMessageTitle;
+
+  /// Confirmation dialog body for pinning a message
+  ///
+  /// In en, this message translates to:
+  /// **'This pins it for everyone in the chat.'**
+  String get pinMessageBody;
+
   /// Message action label for unpinning a message
   ///
   /// In en, this message translates to:

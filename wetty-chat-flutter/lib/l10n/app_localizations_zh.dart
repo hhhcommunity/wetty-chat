@@ -255,6 +255,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pinMessage => '置顶';
 
   @override
+  String get pinMessageTitle => '置顶这条消息？';
+
+  @override
+  String get pinMessageBody => '这会为所有人在聊天中置顶它。';
+
+  @override
   String get unpinMessage => '取消置顶';
 
   @override
@@ -690,6 +696,12 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get pinMessage => '置頂';
+
+  @override
+  String get pinMessageTitle => '置頂這則訊息？';
+
+  @override
+  String get pinMessageBody => '這會為所有人在聊天中置頂它。';
 
   @override
   String get unpinMessage => '取消置頂';
