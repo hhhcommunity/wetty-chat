@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -63,7 +64,7 @@ void main() {
     );
   });
 
-  testWidgets('long press opens sticker preview modal', (
+  testWidgets('long press opens enlarged sticker preview only', (
     WidgetTester tester,
   ) async {
     tester.view.physicalSize = const Size(430, 900);
@@ -73,12 +74,11 @@ void main() {
     SharedPreferences.setMockInitialValues(const <String, Object>{});
     final preferences = await SharedPreferences.getInstance();
     final stickers = List.generate(3, (index) => _stickerDto('s$index'));
+    final stickerApiService = _FakeStickerApiService(favorites: stickers);
     final container = ProviderContainer(
       overrides: [
         sharedPreferencesProvider.overrideWithValue(preferences),
-        stickerApiServiceProvider.overrideWithValue(
-          _FakeStickerApiService(favorites: stickers),
-        ),
+        stickerApiServiceProvider.overrideWithValue(stickerApiService),
       ],
     );
     addTearDown(container.dispose);
@@ -97,11 +97,28 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.longPress(find.byKey(const ValueKey('picker-sticker-s0')));
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byKey(const ValueKey('picker-sticker-s0'))),
+    );
+    await tester.pump(kLongPressTimeout);
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('preview-sticker-s0')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('picker-sticker-preview-s0')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('preview-sticker-s0')), findsNothing);
     expect(find.text('Add to Favorites'), findsNothing);
+    expect(stickerApiService.fetchStickerDetailCount, 0);
+    expect(stickerApiService.fetchPackDetailCount, 0);
+
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('picker-sticker-preview-s0')),
+      findsNothing,
+    );
   });
 }
 
@@ -109,6 +126,8 @@ class _FakeStickerApiService extends StickerApiService {
   _FakeStickerApiService({required this.favorites}) : super(Dio());
 
   final List<StickerSummaryDto> favorites;
+  int fetchStickerDetailCount = 0;
+  int fetchPackDetailCount = 0;
 
   @override
   Future<StickerPackListResponseDto> fetchOwnedPacks() async {
@@ -127,6 +146,7 @@ class _FakeStickerApiService extends StickerApiService {
 
   @override
   Future<StickerDetailResponseDto> fetchStickerDetail(String stickerId) async {
+    fetchStickerDetailCount += 1;
     return StickerDetailResponseDto(
       id: stickerId,
       emoji: '😀',
@@ -139,6 +159,7 @@ class _FakeStickerApiService extends StickerApiService {
 
   @override
   Future<StickerPackDetailResponseDto> fetchPackDetail(String packId) async {
+    fetchPackDetailCount += 1;
     return StickerPackDetailResponseDto(
       id: packId,
       ownerUid: 1,
