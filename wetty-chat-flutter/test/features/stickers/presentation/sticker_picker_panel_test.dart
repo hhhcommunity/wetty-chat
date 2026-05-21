@@ -62,6 +62,47 @@ void main() {
       closeTo(tester.getTopLeft(firstSticker).dy, 0.01),
     );
   });
+
+  testWidgets('long press opens sticker preview modal', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(430, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    SharedPreferences.setMockInitialValues(const <String, Object>{});
+    final preferences = await SharedPreferences.getInstance();
+    final stickers = List.generate(3, (index) => _stickerDto('s$index'));
+    final container = ProviderContainer(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(preferences),
+        stickerApiServiceProvider.overrideWithValue(
+          _FakeStickerApiService(favorites: stickers),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: CupertinoApp(
+          home: CupertinoPageScaffold(
+            child: SafeArea(
+              child: StickerPickerPanel(onStickerSelected: (_) {}),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.longPress(find.byKey(const ValueKey('picker-sticker-s0')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('preview-sticker-s0')), findsOneWidget);
+    expect(find.text('Add to Favorites'), findsNothing);
+  });
 }
 
 class _FakeStickerApiService extends StickerApiService {
@@ -82,6 +123,28 @@ class _FakeStickerApiService extends StickerApiService {
   @override
   Future<FavoriteStickerListResponseDto> fetchFavorites() async {
     return FavoriteStickerListResponseDto(stickers: favorites);
+  }
+
+  @override
+  Future<StickerDetailResponseDto> fetchStickerDetail(String stickerId) async {
+    return StickerDetailResponseDto(
+      id: stickerId,
+      emoji: '😀',
+      media: StickerMediaDto(id: 'media-$stickerId', url: ''),
+      packs: [
+        const StickerPackSummaryDto(id: 'pack-1', ownerUid: 1, name: 'Pack'),
+      ],
+    );
+  }
+
+  @override
+  Future<StickerPackDetailResponseDto> fetchPackDetail(String packId) async {
+    return StickerPackDetailResponseDto(
+      id: packId,
+      ownerUid: 1,
+      name: 'Pack',
+      stickers: favorites,
+    );
   }
 
   @override

@@ -2,8 +2,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/style_config.dart';
-import 'package:chahua/features/shared/presentation/sticker_image_widget.dart';
 import 'package:chahua/features/shared/model/message/message.dart';
+import 'package:chahua/features/shared/presentation/sticker_image_widget.dart';
+import 'package:chahua/features/stickers/presentation/sticker_preview_modal.dart';
 import '../application/sticker_picker_view_model.dart';
 import 'sticker_pack_tab_bar.dart';
 import 'widgets/sticker_grid_layout.dart';
@@ -105,7 +106,7 @@ class _StickerPickerPanelState extends ConsumerState<StickerPickerPanel> {
                 }
                 widget.onStickerSelected(sticker);
               },
-              onToggleFavorite: () => _onToggleFavorite(sticker),
+              onLongPress: () => showStickerPreviewModal(context, sticker.id),
             );
           },
         );
@@ -121,11 +122,6 @@ class _StickerPickerPanelState extends ConsumerState<StickerPickerPanel> {
       notifier.selectPack(packId);
     }
   }
-
-  void _onToggleFavorite(StickerSummary sticker) {
-    final stickerId = sticker.id;
-    ref.read(stickerPickerViewModelProvider.notifier).toggleFavorite(stickerId);
-  }
 }
 
 class _StickerGridCell extends StatelessWidget {
@@ -133,48 +129,32 @@ class _StickerGridCell extends StatelessWidget {
     super.key,
     required this.sticker,
     required this.onTap,
-    required this.onToggleFavorite,
+    required this.onLongPress,
   });
 
   final StickerSummary sticker;
   final VoidCallback onTap;
-  final VoidCallback onToggleFavorite;
+  final VoidCallback onLongPress;
 
   @override
   Widget build(BuildContext context) {
-    final isFavorited = sticker.isFavorited ?? false;
-    return CupertinoContextMenu(
-      actions: [
-        CupertinoContextMenuAction(
-          onPressed: () {
-            Navigator.of(context, rootNavigator: true).pop();
-            onToggleFavorite();
-          },
-          trailingIcon: isFavorited
-              ? CupertinoIcons.star_slash
-              : CupertinoIcons.star,
-          child: Text(
-            isFavorited ? 'Remove from Favorites' : 'Add to Favorites',
-          ),
-        ),
-      ],
-      child: GestureDetector(
-        onTap: onTap,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final imageSize = (constraints.maxWidth - 8).clamp(
-              0.0,
-              double.infinity,
-            );
-            return Center(
-              child: StickerImage(
-                media: sticker.media,
-                emoji: sticker.emoji,
-                size: imageSize,
-              ),
-            );
-          },
-        ),
+    return GestureDetector(
+      onTap: onTap,
+      onLongPress: onLongPress,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final imageSize = (constraints.maxWidth - 8).clamp(
+            0.0,
+            double.infinity,
+          );
+          return Center(
+            child: StickerImage(
+              media: sticker.media,
+              emoji: sticker.emoji,
+              size: imageSize,
+            ),
+          );
+        },
       ),
     );
   }
