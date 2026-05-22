@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:chahua/l10n/app_localizations.dart';
 
 import '../../../../app/theme/style_config.dart';
+import 'unread_badge_formatter.dart';
 
 enum ChatListTab { all, groups, threads }
 
@@ -81,7 +82,7 @@ class _SegmentLabel extends StatelessWidget {
       );
     }
 
-    final badgeText = unreadCount > 99 ? '99+' : '$unreadCount';
+    final badgeText = formatUnreadBadgeCount(unreadCount);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Row(

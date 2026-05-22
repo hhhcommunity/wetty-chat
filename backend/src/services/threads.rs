@@ -214,12 +214,13 @@ pub fn get_thread_unread_count(
                             AND m.id > COALESCE($3, 0)
              WHERE ts.thread_root_id = $1
                AND ts.uid = $2
-             LIMIT 100
+             LIMIT $4
          ) AS unread_messages",
     )
     .bind::<diesel::sql_types::BigInt, _>(thread_root_id)
     .bind::<diesel::sql_types::Integer, _>(uid)
-    .bind::<diesel::sql_types::Nullable<diesel::sql_types::BigInt>, _>(last_read_message_id);
+    .bind::<diesel::sql_types::Nullable<diesel::sql_types::BigInt>, _>(last_read_message_id)
+    .bind::<diesel::sql_types::BigInt, _>(MAX_UNREAD_COUNT);
 
     query
         .get_result::<ThreadUnreadCountRow>(conn)

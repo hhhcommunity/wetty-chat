@@ -7,6 +7,7 @@ import '../../../shared/presentation/chat_timestamp_formatter.dart';
 import 'package:chahua/features/shared/model/message/message.dart';
 import '../../model/thread_list_item.dart';
 import 'list_row_interaction_surface.dart';
+import 'unread_badge_formatter.dart';
 
 /// A single row in the thread list displaying a thread summary.
 ///
@@ -189,7 +190,7 @@ class ThreadListRow extends StatelessWidget {
       ),
       constraints: const BoxConstraints(minWidth: 20),
       child: Text(
-        count > 99 ? '99+' : '$count',
+        formatUnreadBadgeCount(count),
         textAlign: TextAlign.center,
         style: appOnDarkTextStyle(
           context,

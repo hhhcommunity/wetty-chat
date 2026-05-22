@@ -4,6 +4,7 @@ import 'package:chahua/l10n/app_localizations.dart';
 import '../../../../app/theme/style_config.dart';
 import '../../../shared/presentation/app_avatar.dart';
 import 'list_row_interaction_surface.dart';
+import 'unread_badge_formatter.dart';
 
 class ChatListRow extends StatelessWidget {
   const ChatListRow({
@@ -235,7 +236,7 @@ class _UnreadBadge extends StatelessWidget {
       ),
       constraints: const BoxConstraints(minWidth: 20),
       child: Text(
-        count > 99 ? '99+' : '$count',
+        formatUnreadBadgeCount(count),
         textAlign: TextAlign.center,
         style: appOnDarkTextStyle(
           context,

@@ -11,6 +11,7 @@ import 'chat_workspace_layout_scope.dart';
 import 'widgets/list_row_interaction_surface.dart';
 import 'widgets/swipe_to_action_row.dart';
 import 'widgets/thread_list_row.dart';
+import 'widgets/unread_badge_formatter.dart';
 import '../application/thread_list_v2_view_model.dart';
 
 class ThreadListV2View extends ConsumerWidget {
@@ -214,7 +215,7 @@ class _UnreadBadge extends StatelessWidget {
       ),
       constraints: const BoxConstraints(minWidth: 20),
       child: Text(
-        count > 99 ? '99+' : '$count',
+        formatUnreadBadgeCount(count),
         textAlign: TextAlign.center,
         style: appOnDarkTextStyle(
           context,

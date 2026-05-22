@@ -27,6 +27,7 @@ import { Trans } from '@lingui/react/macro';
 import { t } from '@lingui/core/macro';
 import { type ChatListEntry, archiveChat, getChats, unarchiveChat } from '@/api/chats';
 import { archiveThread, getThreads, unarchiveThread } from '@/api/threads';
+import { formatUnreadBadge } from '@/utils/unreadBadge';
 import {
   selectAllChats,
   selectArchivedChats,
@@ -403,7 +404,7 @@ export function ChatList({
         <div className={styles.chatsListBadge}>
           {count > 0 ? (
             <IonBadge mode="ios" color="medium">
-              {count > 99 ? '99+' : count}
+              {formatUnreadBadge(count)}
             </IonBadge>
           ) : null}
         </div>
@@ -491,7 +492,7 @@ export function ChatList({
           <div className={styles.chatsListBadge}>
             {chat.unreadCount > 0 && (
               <IonBadge mode="ios" color={isChatMuted(chat) ? 'medium' : 'primary'}>
-                {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
+                {formatUnreadBadge(chat.unreadCount)}
               </IonBadge>
             )}
           </div>

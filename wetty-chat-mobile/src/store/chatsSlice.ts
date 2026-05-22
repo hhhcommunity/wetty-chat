@@ -4,6 +4,7 @@ import type { RootState } from './index';
 import { toMessagePreview, type MessagePreview, type MessageResponse } from '@/api/messages';
 import type { ChatListEntry } from '@/api/chats';
 import type { GroupRole } from '@/api/group';
+import { UNREAD_BADGE_COUNT_CAP } from '@/utils/unreadBadge';
 import { compareMessageOrder, isSameMessage } from './messageProjection';
 
 export interface ChatMeta {
@@ -91,8 +92,12 @@ function reconcileAuthoritativeListFields(entry: ChatStateEntry, snapshotUnreadC
   if (!entry.liveProjection) return;
 
   const liveUnreadCount = entry.liveProjection.unreadCount;
-  // Chat list counts are capped at 100 for badge queries; keep exact per-chat counts while they are fresher.
-  if (liveUnreadCount == null || snapshotUnreadCount < 100 || liveUnreadCount <= snapshotUnreadCount) {
+  // Chat list counts are capped for badge queries; keep exact per-chat counts while they are fresher.
+  if (
+    liveUnreadCount == null ||
+    snapshotUnreadCount < UNREAD_BADGE_COUNT_CAP ||
+    liveUnreadCount <= snapshotUnreadCount
+  ) {
     delete entry.liveProjection.unreadCount;
   }
   delete entry.liveProjection.lastReadMessageId;

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:chahua/features/chat_list/presentation/widgets/unread_badge_formatter.dart';
 import 'package:chahua/l10n/app_localizations.dart';
 
 import '../routing/route_names.dart';
@@ -200,7 +201,7 @@ class _TabBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final text = count > 99 ? '99+' : '$count';
+    final text = formatUnreadBadgeCount(count);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
       decoration: BoxDecoration(
