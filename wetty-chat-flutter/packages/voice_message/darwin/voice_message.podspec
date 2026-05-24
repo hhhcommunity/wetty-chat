@@ -11,21 +11,24 @@ using vendored swift-ogg source.
   s.author           = { 'Codetector' => 'codetector@codetector.org' }
   s.source           = { :path => '.' }
 
-  s.source_files     = 'Classes/**/*.{swift,c,h}'
-  s.public_header_files = 'Classes/COpusOggBridge/include/**/*.h'
-  s.preserve_paths   = 'Classes/COpusOggBridge/include/module.modulemap'
+  s.source_files     = [
+    'voice_message/Sources/voice_message/**/*.swift',
+    'voice_message/Sources/COpusOggBridge/**/*.{c,h}',
+  ]
+  s.public_header_files = 'voice_message/Sources/COpusOggBridge/include/**/*.h'
+  s.preserve_paths   = 'voice_message/Sources/COpusOggBridge/include/module.modulemap'
 
   s.ios.dependency 'Flutter'
   s.osx.dependency 'FlutterMacOS'
   s.ios.deployment_target = '13.0'
   s.osx.deployment_target = '10.15'
 
-  s.dependency 'libopus/float'
-  s.dependency 'libogg', '~> 1.3'
+  s.dependency 'libopus/float', '= 1.1'
+  s.dependency 'libogg', '= 1.3.5'
 
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
-    'SWIFT_INCLUDE_PATHS' => '$(PODS_TARGET_SRCROOT)/Classes/COpusOggBridge/include',
+    'SWIFT_INCLUDE_PATHS' => '$(PODS_TARGET_SRCROOT)/voice_message/Sources/COpusOggBridge/include',
   }
   s.swift_version = '5.0'
 end

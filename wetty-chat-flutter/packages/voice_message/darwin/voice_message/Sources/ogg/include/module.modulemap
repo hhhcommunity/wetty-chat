@@ -1,0 +1,6 @@
+module ogg {
+  umbrella header "ogg/ogg.h"
+
+  export *
+  module * { export * }
+}
