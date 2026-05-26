@@ -1,0 +1,86 @@
+<h2>How Should Inline Search Tags Enter The Query?</h2>
+<p class="subtitle">
+  Sort is settled as the compact <strong>⇅ Best</strong> control. This screen
+  is only about future UI-layer tags such as <strong>from:@alice</strong>.
+</p>
+
+<div class="cards">
+  <div class="card" data-choice="inline-token" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#f5f5f7;border-radius:24px;padding:16px;max-width:350px;margin:0 auto;color:#1d1d1f;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;">
+        <div style="text-align:center;font-weight:700;font-size:17px;margin-bottom:14px;">Search</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <div style="flex:1;background:#e9e9ee;border-radius:10px;padding:7px 9px;display:flex;align-items:center;gap:5px;min-height:38px;overflow:hidden;">
+            <span style="background:white;border:1px solid #d1d1d6;border-radius:7px;padding:4px 7px;font-size:12px;color:#1d1d1f;white-space:nowrap;">from: Alice ×</span>
+            <span style="font-size:15px;color:#747480;white-space:nowrap;">budget</span>
+          </div>
+          <div style="height:38px;border-radius:19px;background:white;border:1px solid #d1d1d6;display:flex;align-items:center;gap:5px;padding:0 10px;color:#007aff;font-size:13px;font-weight:700;"><span style="font-size:17px;">⇅</span><span>Best</span></div>
+        </div>
+        <div style="margin-top:8px;background:white;border-radius:12px;border:1px solid #e5e5ea;overflow:hidden;">
+          <div style="padding:10px 12px;font-size:13px;font-weight:700;">from:</div>
+          <div style="display:flex;gap:9px;padding:9px 12px;border-top:1px solid #eeeeef;align-items:center;">
+            <div style="width:28px;height:28px;border-radius:50%;background:#85a9ff;"></div>
+            <div style="font-size:13px;">Alice Chen</div>
+          </div>
+          <div style="display:flex;gap:9px;padding:9px 12px;border-top:1px solid #eeeeef;align-items:center;">
+            <div style="width:28px;height:28px;border-radius:50%;background:#a9dd7b;"></div>
+            <div style="font-size:13px;">Alex Wu</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Inline Token Field</h3>
+      <p>Typing <code>from:</code> opens suggestions; selecting a user replaces typed text with an inline token.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="button-inserts-token" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#f5f5f7;border-radius:24px;padding:16px;max-width:350px;margin:0 auto;color:#1d1d1f;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;">
+        <div style="text-align:center;font-weight:700;font-size:17px;margin-bottom:14px;">Search</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <div style="flex:1;background:#e9e9ee;border-radius:10px;padding:9px 12px;color:#747480;font-size:15px;">Search messages</div>
+          <div style="width:38px;height:38px;border-radius:19px;background:white;border:1px solid #d1d1d6;display:flex;align-items:center;justify-content:center;color:#007aff;font-size:18px;font-weight:700;">＋</div>
+          <div style="height:38px;border-radius:19px;background:white;border:1px solid #d1d1d6;display:flex;align-items:center;gap:5px;padding:0 10px;color:#007aff;font-size:13px;font-weight:700;"><span style="font-size:17px;">⇅</span><span>Best</span></div>
+        </div>
+        <div style="margin-top:8px;background:white;border-radius:12px;border:1px solid #e5e5ea;overflow:hidden;">
+          <div style="padding:10px 12px;font-size:13px;font-weight:700;">Add filter</div>
+          <div style="display:flex;justify-content:space-between;padding:10px 12px;border-top:1px solid #eeeeef;font-size:14px;"><span>From someone</span><span style="color:#8e8e93;">›</span></div>
+          <div style="display:flex;justify-content:space-between;padding:10px 12px;border-top:1px solid #eeeeef;font-size:14px;color:#8e8e93;"><span>Has attachment</span><span>Later</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Button Starts Filter Flow</h3>
+      <p>A plus/filter button opens available tags, then inserts the same inline token into the search field.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="hybrid" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#f5f5f7;border-radius:24px;padding:16px;max-width:350px;margin:0 auto;color:#1d1d1f;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;">
+        <div style="text-align:center;font-weight:700;font-size:17px;margin-bottom:14px;">Search</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <div style="flex:1;background:#e9e9ee;border-radius:10px;padding:7px 9px;display:flex;align-items:center;gap:5px;min-height:38px;overflow:hidden;">
+            <span style="background:white;border:1px solid #d1d1d6;border-radius:7px;padding:4px 7px;font-size:12px;color:#1d1d1f;white-space:nowrap;">from: Alice ×</span>
+            <span style="font-size:15px;color:#747480;white-space:nowrap;">Search messages</span>
+          </div>
+          <div style="width:38px;height:38px;border-radius:19px;background:white;border:1px solid #d1d1d6;display:flex;align-items:center;justify-content:center;color:#007aff;font-size:18px;font-weight:700;">＋</div>
+          <div style="height:38px;border-radius:19px;background:white;border:1px solid #d1d1d6;display:flex;align-items:center;gap:5px;padding:0 10px;color:#007aff;font-size:13px;font-weight:700;"><span style="font-size:17px;">⇅</span><span>Best</span></div>
+        </div>
+        <div style="margin-top:8px;background:white;border-radius:12px;border:1px solid #e5e5ea;overflow:hidden;">
+          <div style="padding:10px 12px;font-size:13px;font-weight:700;">Suggestions for from:</div>
+          <div style="display:flex;gap:9px;padding:9px 12px;border-top:1px solid #eeeeef;align-items:center;">
+            <div style="width:28px;height:28px;border-radius:50%;background:#85a9ff;"></div>
+            <div style="font-size:13px;">Alice Chen</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Hybrid</h3>
+      <p>Power users type <code>from:</code>; everyone else can press plus. Both paths create the same inline token model.</p>
+    </div>
+  </div>
+</div>

@@ -2,10 +2,13 @@ import 'package:chahua/core/api/models/chats_api_models.dart';
 import 'package:chahua/core/api/models/messages_api_models.dart';
 import 'package:chahua/core/providers/shared_preferences_provider.dart';
 import 'package:chahua/features/conversation/compose/data/message_api_service_v2.dart';
+import 'package:chahua/features/conversation/compose/presentation/conversation_compose_v2.dart';
 import 'package:chahua/features/conversation/message_bubble/presentation/message_row_v2.dart';
 import 'package:chahua/features/conversation/shared/application/conversation_canonical_message_store.dart';
 import 'package:chahua/features/conversation/shared/domain/conversation_identity.dart';
 import 'package:chahua/features/conversation/shared/domain/launch_request.dart';
+import 'package:chahua/features/conversation/timeline/model/conversation_message_highlight.dart';
+import 'package:chahua/features/conversation/shared/presentation/conversation_surface_v2.dart';
 import 'package:chahua/features/conversation/timeline/presentation/conversation_timeline_view.dart';
 import 'package:chahua/features/conversation/timeline/presentation/conversation_timeline_view_model.dart';
 import 'package:chahua/features/conversation/timeline/presentation/jump_to_latest_fab.dart';
@@ -626,6 +629,156 @@ void main() {
 
         _expectRowBottomPinnedToViewport(tester, 30);
         await _flushHighlightClearTimer(tester);
+      },
+    );
+
+    // Use case:
+    // The user opens a chat with only a handful of unread rows, so every unread
+    // message fits on screen. The first keyboard focus should settle with the
+    // whole unread set visible, not require a dismiss/refocus cycle before the
+    // tail anchors correctly.
+    testWidgets(
+      'keeps small unread set visible after first keyboard focus settles',
+      (tester) async {
+        final api = _FakeMessageApiService(
+          const [],
+          aroundResponses: {
+            20: _response(messages: _messages(20, 26), nextCursor: '19'),
+          },
+        );
+        final container = await _container(api);
+        addTearDown(container.dispose);
+        const launchRequest = LaunchRequest.unread(lastReadMessageId: 20);
+
+        await _pumpTimeline(
+          tester,
+          container: container,
+          viewportHeight: 600,
+          launchRequest: launchRequest,
+        );
+        await tester.pumpAndSettle();
+        for (var id = 21; id <= 26; id++) {
+          _expectRowFullyVisibleInViewport(tester, id);
+        }
+        _expectRowBottomPinnedToViewport(tester, 26);
+
+        await _pumpTimeline(
+          tester,
+          container: container,
+          viewportHeight: 360,
+          launchRequest: launchRequest,
+        );
+        await tester.pumpAndSettle();
+
+        for (var id = 21; id <= 26; id++) {
+          _expectRowFullyVisibleInViewport(tester, id);
+        }
+        _expectRowBottomPinnedToViewport(tester, 26);
+        await _flushHighlightClearTimer(tester);
+      },
+    );
+
+    // Use case:
+    // The real conversation surface keeps the scaffold size fixed and grows the
+    // composer by MediaQuery.viewInsets when the keyboard opens. A small unread
+    // set that fit above the composer before focus should still settle fully
+    // above the expanded composer on the first focus.
+    testWidgets(
+      'keeps small unread set above composer on first keyboard focus frame',
+      (tester) async {
+        final api = _FakeMessageApiService(
+          const [],
+          aroundResponses: {
+            20: _response(messages: _messages(21, 26), nextCursor: '20'),
+          },
+        );
+        final container = await _container(api);
+        addTearDown(container.dispose);
+        const launchRequest = LaunchRequest.unread(lastReadMessageId: 20);
+
+        await _pumpConversationSurface(
+          tester,
+          container: container,
+          keyboardInset: 0,
+          launchRequest: launchRequest,
+        );
+        await _pumpUntilRowExists(tester, 26);
+        for (var id = 21; id <= 26; id++) {
+          _expectRowFullyAboveComposer(tester, id);
+        }
+
+        await tester.tap(find.byType(EditableText));
+        await tester.pump();
+        await _pumpConversationSurface(
+          tester,
+          container: container,
+          keyboardInset: 240,
+          launchRequest: launchRequest,
+        );
+        await tester.pump();
+
+        for (var id = 21; id <= 26; id++) {
+          _expectRowFullyAboveComposer(tester, id);
+        }
+        _expectRowBottomPinnedToComposer(tester, 26);
+        await _flushHighlightClearTimer(tester);
+      },
+    );
+
+    // Use case:
+    // The first unread row is temporarily highlighted to orient the user after
+    // launch. When that highlight expires, only the row decoration should
+    // change; the first clear frame should not hide the scrollable, swap the
+    // top-preferred anchor, or issue a viewport command that can cause a flash.
+    testWidgets(
+      'keeps unread timeline stable on the first frame highlight clears',
+      (tester) async {
+        final api = _FakeMessageApiService(
+          const [],
+          aroundResponses: {
+            20: _response(messages: _messages(21, 26), nextCursor: '20'),
+          },
+        );
+        final container = await _container(api);
+        addTearDown(container.dispose);
+        const launchRequest = LaunchRequest.unread(lastReadMessageId: 20);
+
+        await _pumpTimeline(
+          tester,
+          container: container,
+          viewportHeight: 600,
+          launchRequest: launchRequest,
+        );
+        await _pumpUntilRowExists(tester, 26);
+        await _settleTimeline(tester);
+
+        final stateBefore = container.read(
+          conversationTimelineViewModelProvider(_identity),
+        );
+        final row21Before = tester.getRect(_rowFinder(21));
+        final row26Before = tester.getRect(_rowFinder(26));
+        final anchorBefore = _scrollAnchor(tester);
+        expect(stateBefore.highlight, isNotNull);
+        expect(_timelineOpacity(tester), 1);
+
+        await tester.pump(ConversationMessageHighlight.totalDuration);
+
+        final stateAfter = container.read(
+          conversationTimelineViewModelProvider(_identity),
+        );
+        expect(find.byType(CupertinoActivityIndicator), findsNothing);
+        expect(find.byType(CustomScrollView), findsOneWidget);
+        expect(_timelineOpacity(tester), 1);
+        expect(_scrollAnchor(tester), closeTo(anchorBefore, 0.001));
+        expect(
+          stateAfter.viewportCommandGeneration,
+          stateBefore.viewportCommandGeneration,
+        );
+        expect(tester.getRect(_rowFinder(21)).top, closeTo(row21Before.top, 1));
+        expect(
+          tester.getRect(_rowFinder(26)).bottom,
+          closeTo(row26Before.bottom, 1),
+        );
       },
     );
 
@@ -1527,7 +1680,9 @@ void main() {
 }
 
 const _identity = (chatId: 42, threadRootId: null);
+const _threadIdentity = (chatId: 42, threadRootId: 100);
 const _viewportKey = ValueKey<String>('conversation-timeline-test-viewport');
+const _surfaceKey = ValueKey<String>('conversation-surface-test-viewport');
 
 Future<ProviderContainer> _container(_FakeMessageApiService api) async {
   final preferences = AppPreferences.withData(const <String, Object>{});
@@ -1570,9 +1725,51 @@ Future<void> _pumpTimeline(
   );
 }
 
+Future<void> _pumpConversationSurface(
+  WidgetTester tester, {
+  required ProviderContainer container,
+  required double keyboardInset,
+  LaunchRequest launchRequest = const LaunchRequest.latest(),
+}) async {
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: CupertinoApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: MediaQuery(
+          data: MediaQueryData(
+            size: const Size(390, 600),
+            viewInsets: EdgeInsets.only(bottom: keyboardInset),
+          ),
+          child: SizedBox(
+            key: _surfaceKey,
+            width: 390,
+            height: 600,
+            child: ConversationSurfaceV2(
+              identity: _threadIdentity,
+              launchRequest: launchRequest,
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 Future<void> _settleTimeline(WidgetTester tester) async {
   await tester.pump();
   await tester.pump();
+}
+
+Future<void> _pumpUntilRowExists(WidgetTester tester, int messageId) async {
+  for (var attempt = 0; attempt < 8; attempt++) {
+    await tester.pump();
+    if (_rowFinder(messageId).evaluate().isNotEmpty) {
+      return;
+    }
+  }
+  expect(_rowFinder(messageId), findsOneWidget);
 }
 
 Future<void> _settleLiveEdgeAnimation(WidgetTester tester) async {
@@ -1670,6 +1867,31 @@ void _expectRowVisibleInViewport(WidgetTester tester, int messageId) {
   expect(row.top, lessThan(viewport.bottom));
 }
 
+void _expectRowFullyVisibleInViewport(WidgetTester tester, int messageId) {
+  final finder = _rowFinder(messageId);
+  expect(finder, findsOneWidget);
+  final viewport = tester.getRect(find.byKey(_viewportKey));
+  final row = tester.getRect(finder);
+  expect(row.top, greaterThanOrEqualTo(viewport.top));
+  expect(row.bottom, lessThanOrEqualTo(viewport.bottom));
+}
+
+void _expectRowFullyAboveComposer(WidgetTester tester, int messageId) {
+  final finder = _rowFinder(messageId);
+  expect(finder, findsOneWidget);
+  final surface = tester.getRect(find.byKey(_surfaceKey));
+  final composer = tester.getRect(find.byType(ConversationComposeV2));
+  final row = tester.getRect(finder);
+  expect(row.top, greaterThanOrEqualTo(surface.top));
+  expect(row.bottom, lessThanOrEqualTo(composer.top));
+}
+
+void _expectRowBottomPinnedToComposer(WidgetTester tester, int messageId) {
+  final composer = tester.getRect(find.byType(ConversationComposeV2));
+  final row = tester.getRect(_rowFinder(messageId));
+  expect(row.bottom, closeTo(composer.top, 1));
+}
+
 ({int messageId, Rect rect}) _visibleServerRowClosestToCenter(
   WidgetTester tester,
   Iterable<int> messageIds,
@@ -1699,6 +1921,19 @@ void _expectRowVisibleInViewport(WidgetTester tester, int messageId) {
       .state<ScrollableState>(find.byType(Scrollable))
       .position;
   return (pixels: position.pixels, max: position.maxScrollExtent);
+}
+
+double _scrollAnchor(WidgetTester tester) {
+  return tester.widget<CustomScrollView>(find.byType(CustomScrollView)).anchor;
+}
+
+double _timelineOpacity(WidgetTester tester) {
+  final opacity = find.ancestor(
+    of: find.byType(CustomScrollView),
+    matching: find.byType(Opacity),
+  );
+  expect(opacity, findsOneWidget);
+  return tester.widget<Opacity>(opacity).opacity;
 }
 
 Future<({Rect? rowRect, double scrollAnchor})> _captureNextFrameLayout(

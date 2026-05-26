@@ -133,6 +133,7 @@ class ConversationTimelineViewModel
   bool _shouldCaptureLatestTailSplit = false;
   bool _shouldSettleLiveEdgeAfterPagination = false;
   Timer? _paginationSettleTimer;
+  int? _lastSegmentSignature;
 
   /// Generation of the viewport command, incremented on each issuance
   int _viewportCommandGeneration = 0;
@@ -545,6 +546,10 @@ class ConversationTimelineViewModel
     final currentTailStableKey = segment.orderedMessages.isEmpty
         ? null
         : segment.orderedMessages.last.stableKey;
+    final segmentSignature = _segmentSignature(segment);
+    final segmentDataChanged =
+        _lastSegmentSignature != null &&
+        _lastSegmentSignature != segmentSignature;
     final liveTailChanged =
         currentTailStableKey != null &&
         _lastRenderedTailStableKey != null &&
@@ -557,6 +562,7 @@ class ConversationTimelineViewModel
         _highlightFirstServerMessageIdAfter != null;
     final shouldSettleLiveEdge =
         canFollowLiveEdge &&
+        segmentDataChanged &&
         segment.isLatestSlice &&
         !state.isLoadingNewer &&
         !currentTailIsOptimistic &&
@@ -565,6 +571,7 @@ class ConversationTimelineViewModel
         currentTailStableKey != null;
     final shouldSettleAfterPagination =
         canFollowLiveEdge &&
+        segmentDataChanged &&
         segment.isLatestSlice &&
         state.isLoadingNewer &&
         !currentTailIsOptimistic &&
@@ -577,6 +584,7 @@ class ConversationTimelineViewModel
       'split=${_splitLabel(_renderSplitPolicy)} '
       'before=${beforeMessages.length} after=${afterMessages.length} '
       'lastTail=$_lastRenderedTailStableKey currentTail=$currentTailStableKey '
+      'segmentDataChanged=$segmentDataChanged '
       'liveTailChanged=$liveTailChanged latestSnapshot=$_latestViewportSnapshot '
       'shouldSettleLiveEdge=$shouldSettleLiveEdge '
       'pending=${_commandLabel(_pendingViewportCommand)} generation=$_viewportCommandGeneration',
@@ -599,6 +607,7 @@ class ConversationTimelineViewModel
     final viewportCommand = _takePendingViewportCommand(
       hasMessages: segment.orderedMessages.isNotEmpty,
     );
+    _lastSegmentSignature = segmentSignature;
     _lastRenderedTailStableKey = currentTailStableKey;
 
     return ConversationTimelineState(
@@ -614,6 +623,16 @@ class ConversationTimelineViewModel
       viewportCommandGeneration:
           viewportCommand?.generation ?? _viewportCommandGeneration,
       isBootstrapping: false,
+    );
+  }
+
+  /// Fingerprints rendered data using message object identity, not presentation state.
+  int _segmentSignature(ConversationTimelineActiveSegment segment) {
+    return Object.hash(
+      Object.hashAll(segment.orderedMessages),
+      segment.canLoadBefore,
+      segment.canLoadAfter,
+      segment.isLatestSlice,
     );
   }
 

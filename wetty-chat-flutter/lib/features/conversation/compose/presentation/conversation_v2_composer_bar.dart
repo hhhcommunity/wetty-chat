@@ -51,6 +51,10 @@ class _ConversationV2ComposerBarState
   static const double _audioGestureTargetGap = 18;
   static const int _mentionLimit = 8;
   static const Duration _mentionDebounceDuration = Duration(milliseconds: 250);
+  static const Key _mentionAutocompleteKey = ValueKey(
+    'composer-mention-autocomplete',
+  );
+  static const Key _composerInputChromeKey = ValueKey('composer-input-chrome');
 
   final ScrollController _inputScrollController = ScrollController();
   final TextEditingController _textController = TextEditingController();
@@ -728,6 +732,7 @@ class _ConversationV2ComposerBarState
       children: [
         if (_showMentionAutocomplete)
           Padding(
+            key: _mentionAutocompleteKey,
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
             child: ComposerMentionAutocomplete(
               results: _mentionResults,
@@ -738,6 +743,7 @@ class _ConversationV2ComposerBarState
             ),
           ),
         Padding(
+          key: _composerInputChromeKey,
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,

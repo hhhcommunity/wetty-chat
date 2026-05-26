@@ -80,6 +80,7 @@ class _ConversationTimelineViewState
   final Map<String, GlobalKey> _messageKeys = <String, GlobalKey>{};
   bool _isMeasureScheduled = false;
   double _topPreferredAnchorAlignment = 0;
+  double? _lastMeasuredTopPreferredAfterExtent;
   bool _isTopPreferredAnchorResolved = false;
   UniqueKey _scrollViewKey = UniqueKey();
   TimelineViewportSnapshot _latestViewportSnapshot =
@@ -136,6 +137,7 @@ class _ConversationTimelineViewState
           viewportExtent <= 0) {
         return;
       }
+      _lastMeasuredTopPreferredAfterExtent = afterExtent;
 
       final nextAlignment = resolveTopPreferredAnchorAlignment(
         afterExtent: afterExtent,
@@ -153,6 +155,21 @@ class _ConversationTimelineViewState
         _resetToCenterOrigin();
       });
     });
+  }
+
+  /// Adapts the measured top-preferred anchor to the viewport height in this build.
+  double _topPreferredAnchorForViewport(double viewportExtent) {
+    if (!_isTopPreferredAnchorResolved) {
+      return 0;
+    }
+    final afterExtent = _lastMeasuredTopPreferredAfterExtent;
+    if (afterExtent == null || viewportExtent <= 0) {
+      return _topPreferredAnchorAlignment;
+    }
+    return resolveTimelineTopPreferredAnchorAlignment(
+      afterExtent: afterExtent,
+      viewportExtent: viewportExtent,
+    );
   }
 
   @override
@@ -668,10 +685,6 @@ class _ConversationTimelineViewState
       _consumeViewportCommand(state);
     }
 
-    final centerViewportFraction =
-        placement == ConversationTimelineViewportPlacement.bottomPreferred
-        ? 1.0
-        : (_isTopPreferredAnchorResolved ? _topPreferredAnchorAlignment : 0.0);
     final shouldHideUntilMeasured =
         placement == ConversationTimelineViewportPlacement.topPreferred &&
         !_isTopPreferredAnchorResolved;
@@ -694,83 +707,92 @@ class _ConversationTimelineViewState
 
     _scheduleViewportMeasurement();
 
-    return Stack(
-      children: [
-        Opacity(
-          opacity: shouldHideUntilMeasured ? 0 : 1,
-          child: CustomScrollView(
-            key: _scrollViewKey,
-            center: _centerSliverKey,
-            anchor: centerViewportFraction,
-            controller: _scrollController,
-            slivers: [
-              // Fixed top padding?
-              const SliverPadding(padding: EdgeInsets.only(top: 8)),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final centerViewportFraction =
+            placement == ConversationTimelineViewportPlacement.bottomPreferred
+            ? 1.0
+            : _topPreferredAnchorForViewport(constraints.maxHeight);
 
-              // Before slice (if not empty)
-              if (beforeMessages.isNotEmpty)
-                _buildMessageSliver(
-                  beforeMessages,
-                  highlight: state.highlight,
-                  rowPresentationByStableKey: rowPresentationByStableKey,
-                ),
+        return Stack(
+          children: [
+            Opacity(
+              opacity: shouldHideUntilMeasured ? 0 : 1,
+              child: CustomScrollView(
+                key: _scrollViewKey,
+                center: _centerSliverKey,
+                anchor: centerViewportFraction,
+                controller: _scrollController,
+                slivers: [
+                  // Fixed top padding?
+                  const SliverPadding(padding: EdgeInsets.only(top: 8)),
 
-              // Center sentinel / seam
-              SliverToBoxAdapter(
-                key: _centerSliverKey,
-                child: const SizedBox.shrink(),
-              ),
+                  // Before slice (if not empty)
+                  if (beforeMessages.isNotEmpty)
+                    _buildMessageSliver(
+                      beforeMessages,
+                      highlight: state.highlight,
+                      rowPresentationByStableKey: rowPresentationByStableKey,
+                    ),
 
-              // After slice (if not empty)
-              if (afterMessages.isNotEmpty)
-                _buildMessageSliver(
-                  afterMessages,
-                  key: _afterContentSliverKey,
-                  highlight: state.highlight,
-                  rowPresentationByStableKey: rowPresentationByStableKey,
-                ),
-            ],
-          ),
-        ),
-        if (kDebugMode)
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: IgnorePointer(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  'Seam @ ${centerViewportFraction.toStringAsFixed(2)}'
-                  ' (${placement.name})'
-                  ' cmd: ${state.viewportCommand.kind.name} (${state.viewportCommand.placement.name})'
-                  ' gen: ${state.viewportCommandGeneration}'
-                  ' | before=${state.beforeMessages.length}'
-                  ' after=${state.afterMessages.length}'
-                  ' | visible=${_lastVisibilityWindow?.firstVisibleMessageId.toString() ?? 'null'}'
-                  '..${_lastVisibilityWindow?.lastVisibleMessageId.toString() ?? 'null'}'
-                  ' canLoadNewer=${state.canLoadNewer} isNearBottom=${_latestViewportSnapshot.isNearBottom}'
-                  ' atLiveEdge=${_latestViewportSnapshot.viewportAtLiveEdge}',
-                ),
+                  // Center sentinel / seam
+                  SliverToBoxAdapter(
+                    key: _centerSliverKey,
+                    child: const SizedBox.shrink(),
+                  ),
+
+                  // After slice (if not empty)
+                  if (afterMessages.isNotEmpty)
+                    _buildMessageSliver(
+                      afterMessages,
+                      key: _afterContentSliverKey,
+                      highlight: state.highlight,
+                      rowPresentationByStableKey: rowPresentationByStableKey,
+                    ),
+                ],
               ),
             ),
-          ),
-        if (state.canLoadNewer || !_latestViewportSnapshot.isNearBottom)
-          Positioned(
-            right: _jumpToLatestInset,
-            bottom: _jumpToLatestInset,
-            child: JumpToLatestFab(
-              pendingLiveCount: 0,
-              onPressed: () => ref
-                  .read(
-                    conversationTimelineViewModelProvider(
-                      widget._identity,
-                    ).notifier,
-                  )
-                  .jumpToLatest(),
-            ),
-          ),
-      ],
+            if (kDebugMode)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: IgnorePointer(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      'Seam @ ${centerViewportFraction.toStringAsFixed(2)}'
+                      ' (${placement.name})'
+                      ' cmd: ${state.viewportCommand.kind.name} (${state.viewportCommand.placement.name})'
+                      ' gen: ${state.viewportCommandGeneration}'
+                      ' | before=${state.beforeMessages.length}'
+                      ' after=${state.afterMessages.length}'
+                      ' | visible=${_lastVisibilityWindow?.firstVisibleMessageId.toString() ?? 'null'}'
+                      '..${_lastVisibilityWindow?.lastVisibleMessageId.toString() ?? 'null'}'
+                      ' canLoadNewer=${state.canLoadNewer} isNearBottom=${_latestViewportSnapshot.isNearBottom}'
+                      ' atLiveEdge=${_latestViewportSnapshot.viewportAtLiveEdge}',
+                    ),
+                  ),
+                ),
+              ),
+            if (state.canLoadNewer || !_latestViewportSnapshot.isNearBottom)
+              Positioned(
+                right: _jumpToLatestInset,
+                bottom: _jumpToLatestInset,
+                child: JumpToLatestFab(
+                  pendingLiveCount: 0,
+                  onPressed: () => ref
+                      .read(
+                        conversationTimelineViewModelProvider(
+                          widget._identity,
+                        ).notifier,
+                      )
+                      .jumpToLatest(),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }
