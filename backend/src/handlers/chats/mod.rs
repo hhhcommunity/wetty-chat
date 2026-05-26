@@ -1046,26 +1046,6 @@ async fn get_chats(
     let limit = validate_limit(q.limit, MAX_CHATS_LIMIT);
     let archived = q.archived.unwrap_or(false);
 
-    let unread_count_sql = format!(
-        "(SELECT count(*) FROM (
-            SELECT 1
-            FROM messages
-            WHERE
-                chat_id = groups.id
-            AND
-                reply_root_id IS NULL
-            AND
-                deleted_at IS NULL
-            AND
-                is_published = TRUE
-            AND
-                id > COALESCE(group_membership.last_read_message_id, 0)
-            LIMIT {}
-        ) AS unread_messages)",
-        chat::MAX_UNREAD_COUNT
-    );
-    let unread_count_sq = diesel::dsl::sql::<diesel::sql_types::BigInt>(&unread_count_sql);
-
     let base_query = groups::table
         .inner_join(group_membership::table)
         .left_join(
@@ -1084,7 +1064,6 @@ async fn get_chats(
         String,
         Option<String>,
         Option<DateTime<Utc>>,
-        i64,
         Option<i64>,
         Option<crate::models::Message>,
         Option<DateTime<Utc>>,
@@ -1098,7 +1077,6 @@ async fn get_chats(
                 groups::name,
                 media::storage_key.nullable(),
                 groups::last_message_at,
-                unread_count_sq.clone(),
                 group_membership::last_read_message_id,
                 messages_schema::all_columns.nullable(),
                 group_membership::muted_until,
@@ -1137,7 +1115,6 @@ async fn get_chats(
                         groups::name,
                         media::storage_key.nullable(),
                         groups::last_message_at,
-                        unread_count_sq.clone(),
                         group_membership::last_read_message_id,
                         messages_schema::all_columns.nullable(),
                         group_membership::muted_until,
@@ -1163,7 +1140,6 @@ async fn get_chats(
                         groups::name,
                         media::storage_key.nullable(),
                         groups::last_message_at,
-                        unread_count_sq.clone(),
                         group_membership::last_read_message_id,
                         messages_schema::all_columns.nullable(),
                         group_membership::muted_until,
@@ -1189,8 +1165,32 @@ async fn get_chats(
 
     let messages_to_process: Vec<crate::models::Message> = items_to_process
         .iter()
-        .filter_map(|(_, _, _, _, _, _, msg, _, _)| msg.clone())
+        .filter_map(|(_, _, _, _, _, msg, _, _)| msg.clone())
         .collect();
+
+    let memberships = items_to_process
+        .iter()
+        .map(
+            |(
+                id,
+                _name,
+                _avatar_key,
+                _last_message_at,
+                last_read_message_id,
+                _msg,
+                muted_until,
+                archived,
+            )| crate::services::unread::ChatUnreadMembership {
+                chat_id: *id,
+                last_read_message_id: *last_read_message_id,
+                archived: *archived,
+                muted_until: *muted_until,
+            },
+        )
+        .collect::<Vec<_>>();
+    let unread_counts = state
+        .unread_service
+        .count_membership_unreads(conn, &memberships)?;
 
     let message_responses = attach_metadata(conn, messages_to_process, &state, uid).await;
 
@@ -1208,12 +1208,12 @@ async fn get_chats(
                 name,
                 avatar_key,
                 last_message_at,
-                unread_count,
                 last_read_message_id,
                 msg,
                 muted_until,
                 archived,
             )| {
+                let unread_count = unread_counts.get(&id).copied().unwrap_or(0);
                 let mr = msg
                     .and_then(|m| message_response_map.remove(&m.id))
                     .map(message_response_preview);
@@ -1433,11 +1433,12 @@ async fn get_chat_unread_count(
 )]
 async fn get_unread_count(
     CurrentUid(uid): CurrentUid,
+    State(state): State<AppState>,
     mut conn: DbConn,
 ) -> Result<Json<UnreadCountResponse>, AppError> {
     let conn = &mut *conn;
 
-    let counts = crate::services::chat::get_unread_summary_counts(conn, uid)?;
+    let counts = state.unread_service.count_user_unread_summary(conn, uid)?;
 
     Ok(Json(UnreadCountResponse {
         unread_count: counts.unread_count,

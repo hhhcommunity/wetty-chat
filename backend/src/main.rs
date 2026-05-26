@@ -20,6 +20,7 @@ use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, Env
 use utils::auth::{X_APP_VERSION, X_CLIENT_ID, X_USER_ID};
 use utoipa::OpenApi;
 
+mod constants;
 mod db_tracing;
 mod dto;
 pub(crate) mod errors;
@@ -210,6 +211,7 @@ async fn main() {
             pool.clone(),
             ws_registry.clone(),
             metrics.clone(),
+            unread_service.clone(),
         ),
         unread_service: unread_service.clone(),
         client_tracking: services::client_tracking::ClientTrackingService::start(

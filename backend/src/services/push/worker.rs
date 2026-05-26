@@ -306,7 +306,9 @@ async fn process_push_job(
             .filter_map(|s| seen.insert(s.user_id).then_some(s.user_id))
             .collect()
     };
-    let unread_counts = crate::services::chat::get_unread_counts(&mut conn, &sub_uids)
+    let unread_counts = service
+        .unread_service
+        .count_users_unread_totals(&mut conn, &sub_uids)
         .unwrap_or_else(|e| {
             warn!("Failed to load unread counts for push job: {:?}", e);
             std::collections::HashMap::new()

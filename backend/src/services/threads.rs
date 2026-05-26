@@ -5,6 +5,7 @@ use diesel::PgConnection;
 use std::collections::HashMap;
 use tracing::warn;
 
+use crate::constants::MAX_UNREAD_COUNT;
 use crate::dto::{
     messages::{MessagePreview, MessagePreviewSticker},
     threads::{ListThreadsResponse, ThreadListItem},
@@ -14,7 +15,6 @@ use crate::dto::{
 use crate::handlers::chats::{build_mention_info, build_sender, extract_mention_uids};
 use crate::models::{Attachment, Message, MessageType};
 use crate::schema::{attachments, messages, stickers, thread_meta, thread_subscriptions};
-use crate::services::chat::MAX_UNREAD_COUNT;
 use crate::services::media::build_public_object_url;
 use crate::services::user::{lookup_user_avatars, lookup_user_profiles};
 use crate::services::ws_registry::ConnectionRegistry;

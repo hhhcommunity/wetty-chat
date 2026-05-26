@@ -48,7 +48,7 @@ impl ChatUnreadIndex {
     pub(super) fn observe_message(&mut self, message_id: i64, countable: bool) -> bool {
         match self.message_ids.binary_search(&message_id) {
             Ok(index) => {
-                self.set_countability_at(index, countable);
+                self.set_counted_at(index, countable);
                 true
             }
             Err(index) if index == self.message_ids.len() => {
@@ -61,17 +61,17 @@ impl ChatUnreadIndex {
         }
     }
 
-    pub(super) fn set_countability(&mut self, message_id: i64, countable: bool) -> bool {
+    pub(super) fn set_counted(&mut self, message_id: i64, countable: bool) -> bool {
         match self.message_ids.binary_search(&message_id) {
             Ok(index) => {
-                self.set_countability_at(index, countable);
+                self.set_counted_at(index, countable);
                 true
             }
             Err(_) => false,
         }
     }
 
-    fn set_countability_at(&mut self, index: usize, countable: bool) {
+    fn set_counted_at(&mut self, index: usize, countable: bool) {
         if self.countable[index] == countable {
             return;
         }
@@ -108,17 +108,17 @@ mod tests {
     }
 
     #[test]
-    fn flips_countability_for_recall_and_late_publish() {
+    fn flips_counted_state_for_recall_and_late_publish() {
         let mut index = ChatUnreadIndex::from_snapshot(vec![
             snapshot(10, true),
             snapshot(20, false),
             snapshot(30, true),
         ]);
 
-        assert!(index.set_countability(20, true));
+        assert!(index.set_counted(20, true));
         assert_eq!(index.count_after(None), 3);
 
-        assert!(index.set_countability(30, false));
+        assert!(index.set_counted(30, false));
         assert_eq!(index.count_after(None), 2);
         assert_eq!(index.count_after(Some(20)), 0);
     }
@@ -145,6 +145,6 @@ mod tests {
 
         assert!(!index.observe_message(20, true));
         assert_eq!(index.count_after(None), 3);
-        assert!(!index.set_countability(99, false));
+        assert!(!index.set_counted(99, false));
     }
 }

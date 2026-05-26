@@ -16,6 +16,7 @@ pub use payload::{PushMessagePreview, PushMessagePreviewSticker};
 
 use crate::metrics::Metrics;
 use crate::models::PushProvider;
+use crate::services::unread::UnreadService;
 use crate::services::ws_registry::ConnectionRegistry;
 use delivery::ApnsSender;
 use worker::supervise_push_worker;
@@ -42,6 +43,7 @@ pub struct PushService {
     pub vapid_subject: String,
     apns_sender: Option<ApnsSender>,
     metrics: Arc<Metrics>,
+    unread_service: Arc<UnreadService>,
     job_tx: mpsc::Sender<PushJob>,
 }
 
@@ -54,6 +56,7 @@ impl PushService {
         db: Pool<ConnectionManager<PgConnection>>,
         ws_registry: Arc<ConnectionRegistry>,
         metrics: Arc<Metrics>,
+        unread_service: Arc<UnreadService>,
     ) -> Arc<Self> {
         let public_key = std::env::var("VAPID_PUBLIC_KEY")
             .expect("VAPID_PUBLIC_KEY environment variable must be set");
@@ -78,6 +81,7 @@ impl PushService {
             vapid_subject: subject,
             apns_sender,
             metrics,
+            unread_service,
             job_tx: tx,
         });
 
@@ -593,6 +597,7 @@ mod tests {
             vapid_subject: "mailto:test@example.com".to_string(),
             apns_sender: None,
             metrics: Arc::new(Metrics::new()),
+            unread_service: Arc::new(UnreadService::new()),
             job_tx: mpsc::channel(1).0,
         };
 

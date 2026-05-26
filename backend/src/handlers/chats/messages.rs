@@ -978,7 +978,7 @@ async fn delete_message(
     if deleted_message.reply_root_id.is_none() {
         state
             .unread_service
-            .observe_top_level_message_countability(chat_id, message_id, false);
+            .observe_top_level_message_counted(chat_id, message_id, false);
     }
 
     let response = attach_metadata(conn, vec![deleted_message], &state, uid)
