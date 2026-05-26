@@ -1,12 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { IonButton, IonIcon, IonList, IonNote, IonSpinner, IonText, useIonToast } from '@ionic/react';
-import {
-  bookmarkOutline,
-  chatbubbleOutline,
-  documentAttachOutline,
-  locationOutline,
-  trashOutline,
-} from 'ionicons/icons';
+import { IonButton, IonIcon, IonList, IonNote, IonSpinner, IonText, useIonAlert, useIonToast } from '@ionic/react';
+import { bookmark, bookmarkOutline, chatbubbleOutline, documentAttachOutline, locationOutline } from 'ionicons/icons';
 import { t } from '@lingui/core/macro';
 import { Trans } from '@lingui/react/macro';
 import { useSelector } from 'react-redux';
@@ -144,6 +138,7 @@ function SavedMessageCard({
   const originalTimestamp = formatTimestamp(saved.originalCreatedAt, locale);
   const savedTimestamp = formatTimestamp(saved.savedAt, locale);
   const canOpen = saved.canLocateContext;
+  const openLabel = canOpen ? t`Open original message` : t`Original message is no longer available`;
 
   const handleOpen = () => {
     if (!canOpen) {
@@ -159,7 +154,7 @@ function SavedMessageCard({
         <div className={styles.headerText}>
           <div className={styles.senderRow}>
             <span className={styles.senderName}>{senderName}</span>
-            <IonNote className={styles.savedAt}>{savedTimestamp}</IonNote>
+            <IonNote className={styles.originalAt}>{originalTimestamp}</IonNote>
           </div>
           <div className={styles.chatRow}>
             <IonIcon icon={chatbubbleOutline} aria-hidden="true" />
@@ -184,39 +179,31 @@ function SavedMessageCard({
         </div>
       ) : null}
 
-      <div className={styles.metaGrid}>
-        <div className={styles.metaItem}>
-          <span className={styles.metaLabel}>
-            <Trans>Original</Trans>
-          </span>
-          <span className={styles.metaValue}>{originalTimestamp}</span>
+      <div className={styles.footer}>
+        <IonNote className={styles.savedMeta}>{t`Saved on ${savedTimestamp}`}</IonNote>
+        <div className={styles.actions}>
+          <IonButton
+            aria-label={openLabel}
+            className={styles.iconButton}
+            fill="clear"
+            size="small"
+            disabled={!canOpen}
+            onClick={handleOpen}
+          >
+            <IonIcon icon={locationOutline} slot="icon-only" />
+          </IonButton>
+          <IonButton
+            aria-label={t`Unsave`}
+            className={styles.iconButton}
+            fill="clear"
+            size="small"
+            color="primary"
+            disabled={unsaving}
+            onClick={() => onUnsave(saved)}
+          >
+            <IonIcon icon={bookmark} slot="icon-only" />
+          </IonButton>
         </div>
-        <div className={styles.metaItem}>
-          <span className={styles.metaLabel}>
-            <Trans>Saved</Trans>
-          </span>
-          <span className={styles.metaValue}>{savedTimestamp}</span>
-        </div>
-      </div>
-
-      {!canOpen ? (
-        <div className={styles.unavailableNote}>
-          <IonIcon icon={locationOutline} aria-hidden="true" />
-          <span>
-            <Trans>Original message is no longer available</Trans>
-          </span>
-        </div>
-      ) : null}
-
-      <div className={styles.actions}>
-        <IonButton fill="clear" size="small" disabled={!canOpen} onClick={handleOpen}>
-          <IonIcon icon={locationOutline} slot="start" />
-          <Trans>Open</Trans>
-        </IonButton>
-        <IonButton fill="clear" size="small" color="danger" disabled={unsaving} onClick={() => onUnsave(saved)}>
-          <IonIcon icon={trashOutline} slot="start" />
-          {unsaving ? <Trans>Unsaving...</Trans> : <Trans>Unsave</Trans>}
-        </IonButton>
       </div>
     </article>
   );
@@ -225,6 +212,7 @@ function SavedMessageCard({
 export function SavedMessageList({ chatId, onOpenMessage }: SavedMessageListProps) {
   const locale = useSelector(selectEffectiveLocale);
   const [presentToast] = useIonToast();
+  const [presentAlert] = useIonAlert();
   const [reloadToken, setReloadToken] = useState(0);
   const [state, setState] = useState<SavedMessagesState>({
     requestKey: '',
@@ -337,29 +325,42 @@ export function SavedMessageList({ chatId, onOpenMessage }: SavedMessageListProp
         return;
       }
 
-      const nextUnsavingIds = new Set(unsavingIdsRef.current);
-      nextUnsavingIds.add(saved.id);
-      unsavingIdsRef.current = nextUnsavingIds;
-      setUnsavingIds(nextUnsavingIds);
+      presentAlert({
+        header: t`Unsave Message`,
+        message: t`Remove this message from saved messages?`,
+        buttons: [
+          { text: t`Cancel`, role: 'cancel' },
+          {
+            text: t`Unsave`,
+            role: 'destructive',
+            handler: () => {
+              const nextUnsavingIds = new Set(unsavingIdsRef.current);
+              nextUnsavingIds.add(saved.id);
+              unsavingIdsRef.current = nextUnsavingIds;
+              setUnsavingIds(nextUnsavingIds);
 
-      deleteSavedMessage(saved.id)
-        .then(() => {
-          setState((current) => ({
-            ...current,
-            savedMessages: current.savedMessages.filter((row) => row.id !== saved.id),
-          }));
-        })
-        .catch(() => {
-          presentToast({ message: t`Failed to unsave message`, duration: 3000, position: 'bottom' });
-        })
-        .finally(() => {
-          const next = new Set(unsavingIdsRef.current);
-          next.delete(saved.id);
-          unsavingIdsRef.current = next;
-          setUnsavingIds(next);
-        });
+              deleteSavedMessage(saved.id)
+                .then(() => {
+                  setState((current) => ({
+                    ...current,
+                    savedMessages: current.savedMessages.filter((row) => row.id !== saved.id),
+                  }));
+                })
+                .catch(() => {
+                  presentToast({ message: t`Failed to unsave message`, duration: 3000, position: 'bottom' });
+                })
+                .finally(() => {
+                  const next = new Set(unsavingIdsRef.current);
+                  next.delete(saved.id);
+                  unsavingIdsRef.current = next;
+                  setUnsavingIds(next);
+                });
+            },
+          },
+        ],
+      });
     },
-    [presentToast],
+    [presentAlert, presentToast],
   );
 
   const hasRows = savedMessages.length > 0;

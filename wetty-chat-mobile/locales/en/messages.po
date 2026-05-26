@@ -797,9 +797,6 @@ msgstr "Only members of a selected group can use this invite link to join."
 msgid "Only the selected user can redeem this invite link to join."
 msgstr "Only the selected user can redeem this invite link to join."
 
-msgid "Open"
-msgstr "Open"
-
 msgid "Open chat"
 msgstr "Open chat"
 
@@ -809,6 +806,9 @@ msgstr "Open chat actions"
 msgid "Open emoji picker"
 msgstr "Open emoji picker"
 
+msgid "Open original message"
+msgstr "Open original message"
+
 msgid "Open this invite to view the group and join."
 msgstr "Open this invite to view the group and join."
 
@@ -817,9 +817,6 @@ msgstr "Open thread"
 
 msgid "Optional"
 msgstr "Optional"
-
-msgid "Original"
-msgstr "Original"
 
 msgid "Original message is no longer available"
 msgstr "Original message is no longer available"
@@ -955,6 +952,9 @@ msgstr "Remove Member"
 msgid "Remove Sticker"
 msgstr "Remove Sticker"
 
+msgid "Remove this message from saved messages?"
+msgstr "Remove this message from saved messages?"
+
 msgid "Remove this pack from your collection?"
 msgstr "Remove this pack from your collection?"
 
@@ -1000,6 +1000,9 @@ msgstr "Saved"
 
 msgid "Saved Messages"
 msgstr "Saved Messages"
+
+msgid "Saved on {savedTimestamp}"
+msgstr "Saved on {savedTimestamp}"
 
 msgid "Saving..."
 msgstr "Saving..."
@@ -1189,8 +1192,8 @@ msgstr "Unread"
 msgid "Unsave"
 msgstr "Unsave"
 
-msgid "Unsaving..."
-msgstr "Unsaving..."
+msgid "Unsave Message"
+msgstr "Unsave Message"
 
 msgid "Unsubscribe"
 msgstr "Unsubscribe"

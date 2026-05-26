@@ -797,9 +797,6 @@ msgstr "只有所选群组的成员才能使用此邀请链接加入。"
 msgid "Only the selected user can redeem this invite link to join."
 msgstr "只有所选用户才能兑换此邀请链接并加入。"
 
-msgid "Open"
-msgstr "打开"
-
 msgid "Open chat"
 msgstr "打开聊天"
 
@@ -809,6 +806,9 @@ msgstr "打开聊天操作"
 msgid "Open emoji picker"
 msgstr "打开表情选择器"
 
+msgid "Open original message"
+msgstr "打开原消息"
+
 msgid "Open this invite to view the group and join."
 msgstr "打开此邀请以查看群组并加入。"
 
@@ -817,9 +817,6 @@ msgstr "打开话题"
 
 msgid "Optional"
 msgstr "可选"
-
-msgid "Original"
-msgstr "原始"
 
 msgid "Original message is no longer available"
 msgstr "原始消息已不可用"
@@ -955,6 +952,9 @@ msgstr "移除成员"
 msgid "Remove Sticker"
 msgstr "移除贴纸"
 
+msgid "Remove this message from saved messages?"
+msgstr "从已保存消息中移除此消息？"
+
 msgid "Remove this pack from your collection?"
 msgstr "要将这个表情包从你的收藏中移除吗？"
 
@@ -1000,6 +1000,9 @@ msgstr "收藏"
 
 msgid "Saved Messages"
 msgstr "收藏消息"
+
+msgid "Saved on {savedTimestamp}"
+msgstr "保存于 {savedTimestamp}"
 
 msgid "Saving..."
 msgstr "保存中..."
@@ -1189,8 +1192,8 @@ msgstr "标记未读"
 msgid "Unsave"
 msgstr "取消收藏"
 
-msgid "Unsaving..."
-msgstr "正在取消收藏..."
+msgid "Unsave Message"
+msgstr "取消保存消息"
 
 msgid "Unsubscribe"
 msgstr "取消订阅"

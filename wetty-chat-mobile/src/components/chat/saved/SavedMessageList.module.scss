@@ -77,14 +77,13 @@
   white-space: nowrap;
 }
 
-.savedAt {
+.originalAt {
   flex: 0 0 auto;
   font-size: 0.75rem;
 }
 
 .chatRow,
-.summaryRow,
-.unavailableNote {
+.summaryRow {
   align-items: center;
   color: var(--ion-color-medium);
   display: flex;
@@ -119,43 +118,22 @@
   font-size: 0.84rem;
 }
 
-.metaGrid {
+.footer {
+  align-items: center;
   border-top: 1px solid var(--ion-color-step-150, #e5e5ea);
-  display: grid;
-  gap: 8px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
   padding-top: 10px;
 }
 
-.metaItem {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.metaLabel {
-  color: var(--ion-color-medium);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-.metaValue {
-  color: var(--ion-text-color);
-  font-size: 0.82rem;
+.savedMeta {
+  flex: 1 1 auto;
+  font-size: 0.78rem;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.unavailableNote {
-  background: var(--ion-color-step-100, #f2f2f7);
-  border-radius: 10px;
-  font-size: 0.84rem;
-  padding: 8px 10px;
 }
 
 .actions {
@@ -170,17 +148,22 @@
   text-transform: none;
 }
 
+.iconButton {
+  --border-radius: 50%;
+  --padding-end: 8px;
+  --padding-start: 8px;
+  height: 34px;
+  width: 34px;
+}
+
 .loadMoreWrap {
   padding: 4px 16px 16px;
 }
 
 @media (max-width: 360px) {
-  .metaGrid {
-    grid-template-columns: 1fr;
-  }
-
-  .actions {
-    align-items: stretch;
+  .footer {
+    align-items: flex-start;
     flex-direction: column;
+    gap: 6px;
   }
 }
