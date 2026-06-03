@@ -9,6 +9,7 @@ import {
 } from '../messageEvents';
 import { compareMessageOrder } from '../messageProjection';
 import {
+  activeSegment,
   clearPendingLiveForLoadedMessages,
   DEFAULT_TIMELINE_MODE,
   getChat,
@@ -25,7 +26,13 @@ import {
   upsertOptimisticMessage,
   updateLoadedServerMessage,
 } from './timelineAlgorithms';
-import type { MessagesState, TimelineMode } from './types';
+import type { ChatTimelineState, MessagesState, TimelineMode, TimelineViewState } from './types';
+
+function isActiveViewAtLatestEdge(chat: ChatTimelineState, view: TimelineViewState): boolean {
+  if (!chat.hasReachedLatest) return false;
+  if (view.mode.type === 'latest') return true;
+  return activeSegment(chat, view)?.prevCursor === null;
+}
 
 const initialState: MessagesState = {
   chats: {},
@@ -175,7 +182,7 @@ const messagesSlice = createSlice({
         return;
       }
 
-      if (chat.hasReachedLatest && view.mode.type === 'latest') {
+      if (isActiveViewAtLatestEdge(chat, view)) {
         insertServerMessageIntoLatest(chat, message);
         chat.generation++;
         return;

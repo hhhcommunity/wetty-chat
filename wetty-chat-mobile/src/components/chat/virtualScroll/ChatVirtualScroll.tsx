@@ -1144,12 +1144,30 @@ export function ChatVirtualScroll({
   ]);
 
   const ensureBottomMeasured = useCallback(() => {
-    if (rowKeys.length === 0 || pendingBatch) {
+    if (rowKeys.length === 0) {
       console.debug('[msg-trace] ensureBottomMeasured:bail', {
         rowCount: rowKeys.length,
-        pendingBatch: pendingBatch ? { reason: pendingBatch.reason, size: pendingBatch.keys.length } : null,
+        pendingBatch: null,
         pendingScrollToBottom: pendingScrollToBottomRef.current,
       });
+      return;
+    }
+
+    if (pendingBatch) {
+      const mounted = mountedRef.current;
+      const bottomAlreadyMounted = mounted != null && mounted.end >= rowKeys.length - 1;
+      console.debug('[msg-trace] ensureBottomMeasured:bail', {
+        rowCount: rowKeys.length,
+        pendingBatch: { reason: pendingBatch.reason, size: pendingBatch.keys.length },
+        pendingScrollToBottom: pendingScrollToBottomRef.current,
+        bottomAlreadyMounted,
+      });
+      if (bottomAlreadyMounted && pendingScrollToBottomRef.current) {
+        layoutIntentRef.current = {
+          scrollToBottom: { behavior: pendingScrollToBottomBehaviorRef.current },
+        };
+        triggerRender();
+      }
       return;
     }
 
