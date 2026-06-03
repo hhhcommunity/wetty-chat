@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fmt;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -109,6 +110,7 @@ pub struct MessageSearchService {
     client: Client,
     index_uid: String,
     metrics: Arc<Metrics>,
+    setup_ready: Arc<AtomicBool>,
 }
 
 #[derive(Debug)]
@@ -119,6 +121,7 @@ pub enum MessageSearchError {
     Pool(diesel::r2d2::PoolError),
     TaskFailed(String),
     InvalidPrimaryKey(Option<String>),
+    NotReady,
 }
 
 impl fmt::Display for MessageSearchError {
@@ -135,6 +138,7 @@ impl fmt::Display for MessageSearchError {
                     "message search index primary key must be id, got {key:?}"
                 )
             }
+            Self::NotReady => write!(f, "message search index setup is not complete"),
         }
     }
 }
@@ -241,6 +245,7 @@ impl MessageSearchService {
             client,
             index_uid: config.index_uid,
             metrics,
+            setup_ready: Arc::new(AtomicBool::new(false)),
         })
     }
 
@@ -255,7 +260,9 @@ impl MessageSearchService {
 
     pub async fn ensure_ready(&self) -> Result<(), MessageSearchError> {
         self.ensure_healthy().await?;
-        self.ensure_index_and_settings().await
+        self.ensure_index_and_settings().await?;
+        self.mark_setup_ready();
+        Ok(())
     }
 
     pub fn start_setup_best_effort(self: &Arc<Self>) {
@@ -272,8 +279,17 @@ impl MessageSearchService {
                     index_uid = service.index_uid.as_str(),
                     "message search index setup completed"
                 );
+                service.mark_setup_ready();
             }
         });
+    }
+
+    pub fn is_setup_ready(&self) -> bool {
+        self.setup_ready.load(Ordering::Acquire)
+    }
+
+    fn mark_setup_ready(&self) {
+        self.setup_ready.store(true, Ordering::Release);
     }
 
     async fn ensure_index_and_settings(&self) -> Result<(), MessageSearchError> {
@@ -290,6 +306,10 @@ impl MessageSearchService {
         limit: usize,
         offset: usize,
     ) -> Result<MessageSearchCandidatePage, MessageSearchError> {
+        if !self.is_setup_ready() {
+            return Err(MessageSearchError::NotReady);
+        }
+
         let filter = format!(r#"chatId = "{}""#, chat_id);
         let sort_fields = ["createdAtMillis:desc"];
         let attributes_to_retrieve = DISPLAYED_ATTRIBUTES;
@@ -800,12 +820,15 @@ fn read_required_env(name: &'static str) -> Result<String, MessageSearchConfigEr
 mod tests {
     use chrono::{TimeZone, Utc};
 
+    use std::sync::Arc;
+
+    use crate::metrics::Metrics;
     use crate::models::{Message, MessageType, TranscodeStatus};
 
     use super::{
         filter_authoritative_hits_with_counts, normalize_search_text, project_message_document,
-        validate_search_query, SearchHitCandidate, RANKING_RULES, SETUP_TASK_WAIT_TIMEOUT,
-        TASK_WAIT_TIMEOUT,
+        validate_search_query, MessageSearchConfig, MessageSearchService, SearchHitCandidate,
+        RANKING_RULES, SETUP_TASK_WAIT_TIMEOUT, TASK_WAIT_TIMEOUT,
     };
 
     fn message(id: i64, text: Option<&str>) -> Message {
@@ -859,6 +882,23 @@ mod tests {
     #[test]
     fn setup_task_timeout_is_longer_than_live_index_timeout() {
         assert!(SETUP_TASK_WAIT_TIMEOUT > TASK_WAIT_TIMEOUT);
+    }
+
+    #[test]
+    fn service_starts_not_ready_until_index_setup_completes() {
+        let service = MessageSearchService::new(
+            MessageSearchConfig {
+                meili_url: "http://localhost:7700".to_string(),
+                meili_master_key: "master-key".to_string(),
+                index_uid: "messages_test".to_string(),
+            },
+            Arc::new(Metrics::new()),
+        )
+        .unwrap();
+
+        assert!(!service.is_setup_ready());
+        service.mark_setup_ready();
+        assert!(service.is_setup_ready());
     }
 
     #[test]
