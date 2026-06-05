@@ -11,6 +11,16 @@
   gap: 6px;
 }
 
+.chat-thread-back-buttons ion-back-button {
+  margin-left: 10px;
+}
+
+.chat-thread-content::part(scroll) {
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+
 .chat-thread-title__icon {
   font-size: 0.95em;
   color: var(--ion-color-medium);

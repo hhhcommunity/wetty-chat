@@ -1,5 +1,5 @@
 import { MAX_PINNED_REACTIONS } from '@/constants/emojiAndStickers';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type PointerEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { isPageHidden } from '@/utils/dom';
 import { usePageVisible } from '@/hooks/usePageVisible';
 import { useFloatingDateVisibility } from '@/hooks/useFloatingDate';
@@ -147,6 +147,42 @@ import { favoriteSticker } from '@/api/stickers';
 import { saveMessage } from '@/api/savedMessages';
 import { useFeatureGate } from '@/hooks/useFeatureGate';
 
+
+// Adding empty space swipe back, so it's easier to swipe back to the previous page
+const EMPTY_SPACE_SWIPE_BACK_PROJECTED_DISTANCE_PX = 50;
+const EMPTY_SPACE_SWIPE_BACK_MOMENTUM_MS = 180;
+const EMPTY_SPACE_SWIPE_BACK_MIN_VELOCITY_PX_PER_MS = 0.25;
+const EMPTY_SPACE_SWIPE_BACK_MAX_VERTICAL_DRIFT_PX = 45;
+const EMPTY_SPACE_SWIPE_BACK_VERTICAL_CANCEL_PX = 35;
+
+const EMPTY_SPACE_SWIPE_BLOCK_SELECTOR = [
+  '[data-message-id]',
+  'ion-button',
+  'button',
+  'a',
+  'input',
+  'textarea',
+  'select',
+  '[role="button"]',
+  '[contenteditable="true"]',
+].join(',');
+
+interface EmptySpaceSwipeState {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  previousX: number;
+  previousY: number;
+  previousTime: number;
+  lastX: number;
+  lastY: number;
+  lastTime: number;
+}
+
+function canStartEmptySpaceSwipe(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest(EMPTY_SPACE_SWIPE_BLOCK_SELECTOR) == null;
+}
+
 function generateClientId(): string {
   return `cg_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 }
@@ -230,6 +266,7 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
   const location = useLocation();
   const initialResumeMessageIdRef = useRef<string | null>(parseResumeHash(location.hash));
   const initialResumeMessageId = initialResumeMessageIdRef.current;
+  const emptySpaceSwipeRef = useRef<EmptySpaceSwipeState | null>(null);
   const lastHandledResumeKeyRef = useRef<string | null>(
     initialResumeMessageId ? `${storeChatId}:${initialResumeMessageId}` : null,
   );
@@ -1983,6 +2020,117 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
 
   const chatCtx = useMemo(() => ({ chatId, threadId, jumpToMessage }), [chatId, threadId, jumpToMessage]);
 
+  const runBackAction = useCallback(() => {
+    if (!backAction) return;
+
+    if (backAction.type === 'back') {
+      if (history.length > 1) {
+        history.goBack();
+      } else {
+        history.replace(backAction.defaultHref);
+      }
+      return;
+    }
+
+    if (backAction.type === 'callback') {
+      backAction.onBack();
+      return;
+    }
+
+    backAction.onClose();
+  }, [backAction, history]);
+
+  const handleContentPointerDown = useCallback(
+    (event: PointerEvent<HTMLElement>) => {
+      if (!backAction || event.button !== 0) return;
+      if (!canStartEmptySpaceSwipe(event.target)) return;
+
+      event.currentTarget.setPointerCapture(event.pointerId);
+      emptySpaceSwipeRef.current = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        previousX: event.clientX,
+        previousY: event.clientY,
+        previousTime: event.timeStamp,
+        lastX: event.clientX,
+        lastY: event.clientY,
+        lastTime: event.timeStamp,
+      };
+    },
+    [backAction],
+  );
+
+  const handleContentPointerMove = useCallback((event: PointerEvent<HTMLElement>) => {
+    const swipe = emptySpaceSwipeRef.current;
+    if (!swipe || swipe.pointerId !== event.pointerId) return;
+
+    const deltaX = event.clientX - swipe.startX;
+    const deltaY = event.clientY - swipe.startY;
+    const absDeltaY = Math.abs(deltaY);
+
+    if (absDeltaY > EMPTY_SPACE_SWIPE_BACK_VERTICAL_CANCEL_PX && absDeltaY > Math.abs(deltaX)) {
+      emptySpaceSwipeRef.current = null;
+      return;
+    }
+
+    emptySpaceSwipeRef.current = {
+      ...swipe,
+      previousX: swipe.lastX,
+      previousY: swipe.lastY,
+      previousTime: swipe.lastTime,
+      lastX: event.clientX,
+      lastY: event.clientY,
+      lastTime: event.timeStamp,
+    };
+  }, []);
+
+  const handleContentPointerUp = useCallback(
+    (event: PointerEvent<HTMLElement>) => {
+      const swipe = emptySpaceSwipeRef.current;
+      if (!swipe || swipe.pointerId !== event.pointerId) return;
+
+      emptySpaceSwipeRef.current = null;
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+
+      const deltaX = event.clientX - swipe.startX;
+      const deltaY = event.clientY - swipe.startY;
+      const hasReleaseMovement = Math.abs(event.clientX - swipe.lastX) > 1 || Math.abs(event.clientY - swipe.lastY) > 1;
+      const sampleStartX = hasReleaseMovement ? swipe.lastX : swipe.previousX;
+      const sampleStartY = hasReleaseMovement ? swipe.lastY : swipe.previousY;
+      const sampleStartTime = hasReleaseMovement ? swipe.lastTime : swipe.previousTime;
+      const sampleEndX = hasReleaseMovement ? event.clientX : swipe.lastX;
+      const sampleEndY = hasReleaseMovement ? event.clientY : swipe.lastY;
+      const sampleEndTime = hasReleaseMovement ? event.timeStamp : swipe.lastTime;
+      const sampleDuration = Math.max(1, sampleEndTime - sampleStartTime);
+      const velocityX = (sampleEndX - sampleStartX) / sampleDuration;
+      const velocityY = (sampleEndY - sampleStartY) / sampleDuration;
+      const projectedX = deltaX + Math.max(0, velocityX) * EMPTY_SPACE_SWIPE_BACK_MOMENTUM_MS;
+      const projectedY = deltaY + velocityY * EMPTY_SPACE_SWIPE_BACK_MOMENTUM_MS;
+
+      if (
+        velocityX >= EMPTY_SPACE_SWIPE_BACK_MIN_VELOCITY_PX_PER_MS &&
+        projectedX >= EMPTY_SPACE_SWIPE_BACK_PROJECTED_DISTANCE_PX &&
+        Math.abs(projectedY) <= EMPTY_SPACE_SWIPE_BACK_MAX_VERTICAL_DRIFT_PX &&
+        projectedX > Math.abs(projectedY) * 1.5
+      ) {
+        runBackAction();
+      }
+    },
+    [runBackAction],
+  );
+
+  const resetContentSwipe = useCallback((event: PointerEvent<HTMLElement>) => {
+    if (emptySpaceSwipeRef.current?.pointerId === event.pointerId) {
+      emptySpaceSwipeRef.current = null;
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+    }
+  }, []);
+
   return (
     <ChatContext.Provider value={chatCtx}>
       <div
@@ -1998,7 +2146,9 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
       >
         <IonHeader>
           <IonToolbar>
-            <IonButtons slot="start">{backAction && <BackButton action={backAction} />}</IonButtons>
+            <IonButtons slot="start" className="chat-thread-back-buttons">
+              {backAction && <BackButton action={backAction} />}
+            </IonButtons>
             <IonTitle>
               <span className="chat-thread-title">
                 <span>{chatName}</span>
@@ -2045,7 +2195,15 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
             onClickCounter={() => setPinListOpen(true)}
           />
         )}
-        <IonContent className="chat-thread-content" scrollX={false} scrollY={false}>
+        <IonContent
+          className="chat-thread-content"
+          scrollX={false}
+          scrollY={false}
+          onPointerDown={handleContentPointerDown}
+          onPointerMove={handleContentPointerMove}
+          onPointerUp={handleContentPointerUp}
+          onPointerCancel={resetContentSwipe}
+        >
           <ChatVirtualScroll
             key={storeChatId}
             rows={chatRows}

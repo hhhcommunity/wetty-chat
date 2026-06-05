@@ -17,3 +17,8 @@
 /reference
 .geminiignore
 .playwright-mcp
+
+# Ignore ssh key
+.repo-ssh/
+*.log
+*.err
