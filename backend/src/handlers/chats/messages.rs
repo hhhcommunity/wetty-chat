@@ -30,7 +30,7 @@ use crate::{
 
 use super::{
     attach_metadata, extract_mention_uids, send_prepared_message, ChatIdPath, CreateMessageBody,
-    PreparedMessageSend,
+    PreparedMessageSend, SendMessageOutcome,
 };
 
 #[derive(serde::Deserialize, utoipa::ToSchema)]
@@ -550,7 +550,9 @@ async fn post_message(
         )
         .await?;
 
-        crate::services::chat::mark_chat_as_read(conn, chat_id, uid, send_result.response.id)?;
+        if let SendMessageOutcome::Created(send_result) = &send_result {
+            crate::services::chat::mark_chat_as_read(conn, chat_id, uid, send_result.response.id)?;
+        }
 
         Ok(send_result)
     }
@@ -567,15 +569,21 @@ async fn post_message(
         }
     };
 
-    send_result.side_effects.fire(&state);
-    if let Some(search_service) = state.message_search.clone() {
-        search_service.upsert_message_best_effort(send_result.inserted_message);
-    }
-    if matches!(send_result.response.message_type, MessageType::Audio) {
-        crate::services::audio_transcode::enqueue_message(send_result.response.id);
-    }
+    let response = match send_result {
+        SendMessageOutcome::Created(send_result) => {
+            send_result.side_effects.fire(&state);
+            if let Some(search_service) = state.message_search.clone() {
+                search_service.upsert_message_best_effort(send_result.inserted_message);
+            }
+            if matches!(send_result.response.message_type, MessageType::Audio) {
+                crate::services::audio_transcode::enqueue_message(send_result.response.id);
+            }
+            send_result.response
+        }
+        SendMessageOutcome::Duplicate(response) => response,
+    };
 
-    Ok((StatusCode::CREATED, Json(send_result.response)))
+    Ok((StatusCode::CREATED, Json(response)))
 }
 
 /// POST /chats/:chat_id/threads/:thread_id/messages — Send a message in a thread.
@@ -659,9 +667,13 @@ pub(super) async fn post_thread_message(
             },
         )
         .await?;
-        let response = send_result.response;
-        let member_uids = send_result.member_uids;
-        let msg_side_effects = send_result.side_effects;
+        let send_result = match send_result {
+            SendMessageOutcome::Created(send_result) => send_result,
+            SendMessageOutcome::Duplicate(response) => {
+                return Ok(SendMessageOutcome::Duplicate(response));
+            }
+        };
+        let response = send_result.response.clone();
         let publish_now = publish_immediately;
 
         // Auto-subscribe the replying user and track read position
@@ -706,11 +718,11 @@ pub(super) async fn post_thread_message(
                 .execute(conn)?;
         }
 
-        Ok((response, member_uids, msg_side_effects))
+        Ok(SendMessageOutcome::Created(send_result))
     }
     .await;
 
-    let (response, member_uids, msg_side_effects) = match tx_result {
+    let send_result = match tx_result {
         Ok(data) => {
             diesel::sql_query("COMMIT").execute(conn)?;
             data
@@ -720,6 +732,17 @@ pub(super) async fn post_thread_message(
             return Err(e);
         }
     };
+
+    let send_result = match send_result {
+        SendMessageOutcome::Created(send_result) => send_result,
+        SendMessageOutcome::Duplicate(response) => {
+            return Ok((StatusCode::CREATED, Json(response)));
+        }
+    };
+
+    let response = send_result.response;
+    let member_uids = send_result.member_uids;
+    let msg_side_effects = send_result.side_effects;
 
     // Post-commit: fire deferred side effects (new message WS broadcast + push)
     msg_side_effects.fire(&state);

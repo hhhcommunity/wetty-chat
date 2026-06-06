@@ -99,6 +99,7 @@ pub struct ChatIdPath {
     chat_id: i64,
 }
 
+#[derive(Clone)]
 pub(crate) struct PreparedMessageSend {
     pub chat_id: i64,
     pub sender_uid: i32,
@@ -117,6 +118,11 @@ pub(crate) struct SendMessageResult {
     pub response: MessageResponse,
     pub member_uids: Vec<i32>,
     pub side_effects: PendingSideEffects,
+}
+
+pub(crate) enum SendMessageOutcome {
+    Created(SendMessageResult),
+    Duplicate(MessageResponse),
 }
 
 #[must_use = "side effects must be fired via .fire()"]
@@ -518,7 +524,7 @@ pub(crate) async fn send_prepared_message(
     conn: &mut PgConnection,
     state: &AppState,
     prepared: PreparedMessageSend,
-) -> Result<SendMessageResult, AppError> {
+) -> Result<SendMessageOutcome, AppError> {
     let id = ids::next_message_id(state.id_gen.as_ref())
         .await
         .map_err(|e| {
@@ -541,13 +547,13 @@ pub(crate) async fn send_prepared_message(
 
     let new_msg = NewMessage {
         id,
-        message: prepared.message,
+        message: prepared.message.clone(),
         message_type,
         sticker_id: prepared.sticker_id,
         reply_to_id: prepared.reply_to_id,
         reply_root_id: prepared.reply_root_id,
         created_at: now,
-        client_generated_id: prepared.client_generated_id,
+        client_generated_id: prepared.client_generated_id.clone(),
         sender_uid: prepared.sender_uid,
         chat_id: prepared.chat_id,
         updated_at: None,
@@ -559,10 +565,29 @@ pub(crate) async fn send_prepared_message(
         transcode_status,
     };
 
-    let inserted_msg: Message = diesel::insert_into(messages_schema::table)
+    let inserted_msg: Option<Message> = diesel::insert_into(messages_schema::table)
         .values(&new_msg)
+        .on_conflict(messages_schema::client_generated_id)
+        .do_nothing()
         .returning(Message::as_returning())
-        .get_result(conn)?;
+        .get_result(conn)
+        .optional()?;
+    let Some(inserted_msg) = inserted_msg else {
+        let existing = messages_schema::table
+            .filter(messages_schema::client_generated_id.eq(&prepared.client_generated_id))
+            .select(Message::as_select())
+            .first::<Message>(conn)
+            .optional()?
+            .ok_or(AppError::Conflict("Duplicate client generated id"))?;
+        let existing_attachment_ids = load_message_attachment_ids(conn, existing.id)?;
+        validate_idempotent_message_payload(&existing, &prepared, &existing_attachment_ids)?;
+        let response = attach_metadata(conn, vec![existing], state, prepared.sender_uid)
+            .await
+            .into_iter()
+            .next()
+            .ok_or(AppError::Internal("Failed to build message response"))?;
+        return Ok(SendMessageOutcome::Duplicate(response));
+    };
     state.metrics.record_message(prepared.chat_id);
 
     if prepared.publish_immediately && prepared.reply_root_id.is_none() {
@@ -617,12 +642,55 @@ pub(crate) async fn send_prepared_message(
         )
     };
 
-    Ok(SendMessageResult {
+    Ok(SendMessageOutcome::Created(SendMessageResult {
         inserted_message: inserted_msg,
         response,
         member_uids,
         side_effects,
-    })
+    }))
+}
+
+fn load_message_attachment_ids(conn: &mut PgConnection, message_id: i64) -> QueryResult<Vec<i64>> {
+    use crate::schema::attachments::dsl as a_dsl;
+    attachments::table
+        .filter(a_dsl::message_id.eq(message_id))
+        .filter(a_dsl::deleted_at.is_null())
+        .select(a_dsl::id)
+        .order(a_dsl::id.asc())
+        .load::<i64>(conn)
+}
+
+fn validate_idempotent_message_payload(
+    existing: &Message,
+    prepared: &PreparedMessageSend,
+    existing_attachment_ids: &[i64],
+) -> Result<(), AppError> {
+    let mut prepared_attachment_ids = prepared.attachment_ids.clone();
+    prepared_attachment_ids.sort_unstable();
+    let mut existing_attachment_ids = existing_attachment_ids.to_vec();
+    existing_attachment_ids.sort_unstable();
+
+    let attachment_ids_match = if matches!(existing.message_type, MessageType::Audio) {
+        existing.has_attachments == !prepared.attachment_ids.is_empty()
+    } else {
+        existing_attachment_ids == prepared_attachment_ids
+    };
+
+    if existing.chat_id == prepared.chat_id
+        && existing.sender_uid == prepared.sender_uid
+        && existing.message == prepared.message
+        && existing.message_type == prepared.message_type
+        && existing.sticker_id == prepared.sticker_id
+        && existing.reply_to_id == prepared.reply_to_id
+        && existing.reply_root_id == prepared.reply_root_id
+        && attachment_ids_match
+    {
+        return Ok(());
+    }
+
+    Err(AppError::Conflict(
+        "clientGeneratedId already exists with different payload",
+    ))
 }
 
 // ---------------------------------------------------------------------------
@@ -1606,11 +1674,11 @@ mod tests {
     use super::{
         attachment_preview_text, build_push_preview_bundle, extract_mention_uids,
         first_attachment_kind, render_mentions_as_text, sticker_preview_text, MentionInfo,
-        MessagePreview,
+        MessagePreview, PreparedMessageSend,
     };
     use crate::{
         dto::{attachments::AttachmentResponse, users::User},
-        models::{Attachment, MessageType},
+        models::{Attachment, Message, MessageType, TranscodeStatus},
     };
     use chrono::Utc;
     use serde_json::json;
@@ -1673,6 +1741,112 @@ mod tests {
 
         assert_eq!(render_mentions_as_text(text, &mentions), text);
         assert!(extract_mention_uids(text).is_empty());
+    }
+
+    #[test]
+    fn idempotent_message_payload_accepts_identical_top_level_message() {
+        let existing = test_message();
+        let prepared = test_prepared_message();
+
+        assert!(
+            super::validate_idempotent_message_payload(&existing, &prepared, &[10, 11]).is_ok()
+        );
+    }
+
+    #[test]
+    fn idempotent_message_payload_rejects_different_text() {
+        let existing = test_message();
+        let prepared = PreparedMessageSend {
+            message: Some("different".to_string()),
+            ..test_prepared_message()
+        };
+
+        assert!(matches!(
+            super::validate_idempotent_message_payload(&existing, &prepared, &[10, 11]),
+            Err(super::AppError::Conflict(_))
+        ));
+    }
+
+    #[test]
+    fn idempotent_message_payload_rejects_different_thread_context() {
+        let existing = Message {
+            reply_root_id: Some(99),
+            ..test_message()
+        };
+        let prepared = test_prepared_message();
+
+        assert!(matches!(
+            super::validate_idempotent_message_payload(&existing, &prepared, &[10, 11]),
+            Err(super::AppError::Conflict(_))
+        ));
+    }
+
+    #[test]
+    fn idempotent_message_payload_rejects_different_attachment_set() {
+        let existing = test_message();
+        let prepared = test_prepared_message();
+
+        assert!(matches!(
+            super::validate_idempotent_message_payload(&existing, &prepared, &[10, 12]),
+            Err(super::AppError::Conflict(_))
+        ));
+    }
+
+    #[test]
+    fn idempotent_message_payload_accepts_audio_after_attachment_rewrite() {
+        let existing = Message {
+            message_type: MessageType::Audio,
+            message: Some(String::new()),
+            has_attachments: true,
+            transcode_status: TranscodeStatus::Done,
+            ..test_message()
+        };
+        let prepared = PreparedMessageSend {
+            message_type: MessageType::Audio,
+            message: Some(String::new()),
+            attachment_ids: vec![55],
+            publish_immediately: false,
+            ..test_prepared_message()
+        };
+
+        assert!(super::validate_idempotent_message_payload(&existing, &prepared, &[]).is_ok());
+    }
+
+    fn test_message() -> Message {
+        Message {
+            id: 1,
+            message: Some("hello".to_string()),
+            message_type: MessageType::Text,
+            reply_to_id: Some(5),
+            reply_root_id: None,
+            client_generated_id: "client-1".to_string(),
+            sender_uid: 7,
+            chat_id: 42,
+            created_at: Utc::now(),
+            updated_at: None,
+            deleted_at: None,
+            has_attachments: true,
+            has_thread: false,
+            has_reactions: false,
+            sticker_id: None,
+            is_published: true,
+            transcode_status: TranscodeStatus::None,
+        }
+    }
+
+    fn test_prepared_message() -> PreparedMessageSend {
+        PreparedMessageSend {
+            chat_id: 42,
+            sender_uid: 7,
+            message: Some("hello".to_string()),
+            message_type: MessageType::Text,
+            sticker_id: None,
+            reply_to_id: Some(5),
+            reply_root_id: None,
+            client_generated_id: "client-1".to_string(),
+            attachment_ids: vec![10, 11],
+            publish_immediately: true,
+        }
     }
 
     #[test]
