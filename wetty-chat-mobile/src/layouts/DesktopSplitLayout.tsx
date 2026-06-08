@@ -364,7 +364,6 @@ export function DesktopSplitLayout() {
     const { id, threadId } = threadMatch;
     subPageOverlay = (
       <ChatThreadCore
-        key={threadId}
         chatId={id}
         threadId={threadId}
         backAction={{
@@ -418,7 +417,7 @@ export function DesktopSplitLayout() {
         {/* Base layer: always render ChatThreadCore when a chat is selected */}
         {activeChatId && !isNewChat && !joinPreviewMatch && (
           <div style={{ display: subPageOverlay ? 'none' : undefined }} className={styles.desktopSplitPane}>
-            <ChatThreadCore key={activeChatId} chatId={activeChatId} />
+            <ChatThreadCore chatId={activeChatId} />
           </div>
         )}
 

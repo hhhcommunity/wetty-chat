@@ -842,6 +842,66 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
     }
   }, [storeChatId]);
 
+  // Reset all per-chat/thread local state when switching conversations so the
+  // component can survive prop changes without being remounted (which avoids
+  // the scroll-flash caused by ChatVirtualScroll losing its scroll state).
+  useEffect(() => {
+    initialResumeMessageIdRef.current = parseResumeHash(location.hash);
+    const resumeId = initialResumeMessageIdRef.current;
+    lastHandledResumeKeyRef.current = resumeId ? `${storeChatId}:${resumeId}` : null;
+    setPendingResumeMessageId(resumeId);
+    setInitialAnchor(() => {
+      if (resumeId) {
+        return { type: 'message', messageId: resumeId, token: 0 };
+      }
+      return { type: threadId ? 'top' : 'bottom', token: 0 } as VirtualScrollAnchor;
+    });
+    setAtBottom(() => {
+      if (threadId) return false;
+      if (resumeId) return false;
+      return true;
+    });
+    setReplyingTo(null);
+    setEditingSession(null);
+    setOverlayMessage(null);
+    setStickerPreviewId(null);
+    setProfileSender(null);
+    setReactionDetail(null);
+    setPinListOpen(false);
+    setLoadingMore(false);
+    setLoadingNewer(false);
+    loadingMoreRef.current = false;
+    loadingNewerRef.current = false;
+    setComposeFocused(false);
+    setMessageListScrolling(false);
+    setFloatingDateColliding(false);
+    setLastFullyVisibleMessageId(null);
+    setFirstVisibleMessageId(null);
+    setIsScrollingTowardNewerMessages(false);
+    previousFirstVisibleComparableIdRef.current = null;
+    didAutoFocusRef.current = false;
+    threadLastReadMessageIdRef.current = null;
+    deferredOverlayRef.current = null;
+    scrollApiRef.current = null;
+    setThreadSubscribed(null);
+    setThreadArchived(false);
+    setThreadSubLoading(false);
+    lastReportedReadId.current = null;
+    initialLoadCompletedRef.current = false;
+    pendingReadTargetIdRef.current = null;
+    lastReadRequestAtRef.current = 0;
+    if (readRequestTimerRef.current) {
+      clearTimeout(readRequestTimerRef.current);
+      readRequestTimerRef.current = null;
+    }
+    lastThreadReadIdRef.current = null;
+    pendingThreadReadIdRef.current = null;
+    if (threadReadTimerRef.current) {
+      clearTimeout(threadReadTimerRef.current);
+      threadReadTimerRef.current = null;
+    }
+  }, [storeChatId, threadId]);
+
   // Strip the #msg= hash after it has been captured into initialResumeMessageId
   // so it doesn't linger in the URL bar or get re-consumed on re-render.
   useEffect(() => {
@@ -2047,7 +2107,6 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
         )}
         <IonContent className="chat-thread-content" scrollX={false} scrollY={false}>
           <ChatVirtualScroll
-            key={storeChatId}
             rows={chatRows}
             renderRow={renderRow}
             initialAnchor={initialAnchor}
@@ -2223,13 +2282,12 @@ function ChatThreadCore({ chatId, threadId, backAction }: ChatThreadCoreProps) {
 
 export function ChatThreadPage() {
   const { id: chatId, threadId } = useParams<{ id: string; threadId?: string }>();
-  const renderKey = threadId ?? chatId;
   const backAction: BackAction = threadId
     ? { type: 'back', defaultHref: `/chats/chat/${chatId}` }
     : { type: 'back', defaultHref: '/chats' };
   return (
     <IonPage>
-      <ChatThreadCore key={renderKey} chatId={chatId} threadId={threadId} backAction={backAction} />
+      <ChatThreadCore chatId={chatId} threadId={threadId} backAction={backAction} />
     </IonPage>
   );
 }

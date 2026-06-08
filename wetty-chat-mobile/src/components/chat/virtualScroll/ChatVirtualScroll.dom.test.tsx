@@ -263,4 +263,54 @@ describe('ChatVirtualScroll realtime appends', () => {
 
     expect(scrollContainer!.scrollTop).toBe(currentRowCount * ROW_HEIGHT - currentViewportHeight);
   });
+
+  it('handles complete rows reset (different chat) without remounting and bootstraps to the new bottom', async () => {
+    const scrollApiRef = { current: null } as MutableRefObject<VirtualScrollHandle | null>;
+
+    await act(async () => {
+      renderVirtualScroll(root, rows(40), scrollApiRef);
+    });
+    scrollContainer = host.firstElementChild as HTMLElement;
+    currentViewportHeight = VIEWPORT_HEIGHT + 1;
+    await flushLayout();
+    currentViewportHeight = VIEWPORT_HEIGHT;
+    await flushLayout(8);
+    expect(host.querySelector('[data-testid="msg:40"]')).not.toBeNull();
+
+    // Scroll away from bottom
+    await act(async () => {
+      scrollContainer!.scrollTop = 10 * ROW_HEIGHT;
+      scrollContainer!.dispatchEvent(new Event('scroll', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    // Replace rows with a completely different set (different keys)
+    currentRowCount = 20;
+    const newRows: ChatRow[] = Array.from({ length: 20 }, (_, index) => {
+      const id = String(index + 100);
+      return {
+        type: 'message',
+        key: `msg:${id}`,
+        messageId: id,
+        clientGeneratedId: `client-${id}`,
+        message: message(id),
+        showName: true,
+        showAvatar: true,
+      };
+    });
+
+    await act(async () => {
+      renderVirtualScroll(root, newRows, scrollApiRef);
+      await Promise.resolve();
+    });
+
+    await flushLayout(8);
+
+    // Old rows should be gone
+    expect(host.querySelector('[data-testid="msg:40"]')).toBeNull();
+    // New rows should be present
+    expect(host.querySelector('[data-testid="msg:119"]')).not.toBeNull();
+    // Should be at the bottom of the new content
+    expect(scrollContainer!.scrollTop).toBe(20 * ROW_HEIGHT - currentViewportHeight);
+  });
 });
